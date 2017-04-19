@@ -20,6 +20,10 @@
 #include <sys/syscall.h>
 #endif
 
+#if defined(WEBRTC_ANDROID)
+#include <sys/prctl.h>
+#endif
+
 namespace rtc {
 
 PlatformThreadId CurrentThreadId() {
