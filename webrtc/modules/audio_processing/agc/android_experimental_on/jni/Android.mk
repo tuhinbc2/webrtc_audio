@@ -21,50 +21,57 @@ LOCAL_MODULE    := agc
 LOCAL_SRC_FILES :=  \
 	$(L_AGC_PATH)/analog_agc.c \
 	$(L_AGC_PATH)/digital_agc.c \
+	$(AGC_PATH)/agc.cc \
+	$(AGC_PATH)/agc_manager_direct.cc \
+	$(AGC_PATH)/loudness_histogram.cc \
+	$(AGC_PATH)/utility.cc \
+	$(VAD_PATH)voice_activity_detector.cc \
+	$(VAD_PATH)vad_audio_proc.cc \
+	$(VAD_PATH)pole_zero_filter.cc \
+	$(VAD_PATH)pitch_internal.cc \
+	$(VAD_PATH)standalone_vad.cc \
+	$(VAD_PATH)pitch_based_vad.cc \
+	$(VAD_PATH)gmm.cc \
+	$(VAD_PATH)vad_circular_buffer.cc \
+	$(ISAC_PATH)intialize.c \
+	$(ISAC_PATH)lpc_analysis.c \
+	$(ISAC_PATH)filter_functions.c \
+	$(ISAC_PATH)filterbanks.c \
+	$(ISAC_PATH)pitch_estimator.c \
+	$(ISAC_PATH)filterbank_tables.c \
+	$(ISAC_PATH)pitch_filter.c \
+	$(BASE_PATH)logging.cc \
+	$(BASE_PATH)timeutils.cc \
+	$(BASE_PATH)platform_thread.cc \
 	$(BASE_PATH)checks.cc \
-	$(SP_PATH)spl_sqrt.c \
+	$(BASE_PATH)event_tracer.cc \
+	$(BASE_PATH)criticalsection.cc \
+	$(BASE_PATH)event.cc \
+	$(BASE_PATH)stringencode.cc \
+	$(COMMON_VAD_PATH)webrtc_vad.c \
+	$(COMMON_VAD_PATH)vad_core.c \
+	$(COMMON_VAD_PATH)vad_sp.c \
+	$(COMMON_VAD_PATH)vad_filterbank.c \
+	$(COMMON_VAD_PATH)vad_gmm.c \
+	$(SP_PATH)spl_init.c \
+	$(SP_PATH)min_max_operations.c \
+	$(SP_PATH)cross_correlation.c \
+	$(SP_PATH)downsample_fast.c \
+	$(SP_PATH)vector_scaling_operations.c \
+	$(SP_PATH)resample_48khz.c \
+	$(SP_PATH)resample_by_2_internal.c \
+	$(SP_PATH)resample_fractional.c \
+	$(SP_PATH)energy.c \
+	$(SP_PATH)get_scaling_square.c \
 	$(SP_PATH)division_operations.c \
+	$(SP_PATH)resample.c \
 	$(SP_PATH)resample_by_2.c \
 	$(SP_PATH)dot_product_with_scale.cc \
 	$(SP_PATH)copy_set_operations.c \
-
-
-
-
-#	$(SP_PATH)spl_init.c \
-
-
-	
-
-
-
-
-
-
-
-	#$(SP_PATH)resample_48khz.c \
-	
-
-
-
-
-	#$(SP_PATH)energy.c \
-	
-
-
-
-
-
-	#$(SP_PATH)resample.c \
-	
-
-	#$(COMMON_AUDIO_PATH)fft4g.c \
-	
-
-	#$(WEBRTC_PATH)common_audio/resampler/resampler.cc \
-	
-
-	#$(WEBRTC_PATH)system_wrappers/source/metrics_default.cc \
+	$(SP_PATH)spl_sqrt.c \
+	$(COMMON_AUDIO_PATH)fft4g.c \
+	$(WEBRTC_PATH)common_audio/resampler/resampler.cc \
+	$(WEBRTC_PATH)system_wrappers/source/metrics_default.cc \
 
 
 LOCAL_CFLAGS := -DWEBRTC_ANDROID -O3 -DWEBRTC_POSIX -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -D__UCLIBC__
