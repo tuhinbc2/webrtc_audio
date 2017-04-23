@@ -29,46 +29,8 @@ LOCAL_SRC_FILES :=  \
 	$(SP_PATH)copy_set_operations.c \
 
 
-
-
-#	$(SP_PATH)spl_init.c \
-
-
-	
-
-
-
-
-
-
-
-	#$(SP_PATH)resample_48khz.c \
-	
-
-
-
-
-	#$(SP_PATH)energy.c \
-	
-
-
-
-
-
-	#$(SP_PATH)resample.c \
-	
-
-	#$(COMMON_AUDIO_PATH)fft4g.c \
-	
-
-	#$(WEBRTC_PATH)common_audio/resampler/resampler.cc \
-	
-
-	#$(WEBRTC_PATH)system_wrappers/source/metrics_default.cc \
-
-
-LOCAL_CFLAGS := -DWEBRTC_ANDROID -O3 -DWEBRTC_POSIX -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -D__UCLIBC__
+LOCAL_CFLAGS := -DWEBRTC_ANDROID -O3 -DWEBRTC_POSIX -D__UCLIBC__
 #TODO: enable cflags -O3
 #TODO: who defined __GLIBCXX__? . for more info remove uclibc from cflag
 LOCAL_LDLIBS := -llog
-include $(BUILD_SHARED_LIBRARY)
+include $(BUILD_STATIC_LIBRARY)
