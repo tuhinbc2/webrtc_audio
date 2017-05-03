@@ -27,7 +27,7 @@ int main()
 	WebRtcAgcConfig gain_config;
 
 	gain_config.targetLevelDbfs = 3;
-	gain_config.compressionGaindB = 10;
+	gain_config.compressionGaindB = 7;
 	gain_config.limiterEnable = true;
 	if ((agcret = WebRtcAgc_set_config(AGC_instance, gain_config)))
 	{
@@ -39,8 +39,8 @@ int main()
 	}
 
 
-	FILE* in = fopen("data/near.pcm", "rb");
-	FILE* out = fopen("near.pcm", "wb");
+	FILE* in = fopen("data/far.pcm", "rb");
+	FILE* out = fopen("far.pcm", "wb");
 
 	if(in == NULL || out == NULL){
 		LOGT("file not found");

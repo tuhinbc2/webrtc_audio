@@ -17,7 +17,7 @@ LOCAL_C_INCLUDES := $(WEBRTC_PATH)
 AGC_PATH := ../../
 L_AGC_PATH := $(AGC_PATH)/legacy/
 
-LOCAL_MODULE    := agc
+LOCAL_MODULE    := webrtc_agc
 LOCAL_SRC_FILES :=  \
 	$(L_AGC_PATH)/analog_agc.c \
 	$(L_AGC_PATH)/digital_agc.c \
