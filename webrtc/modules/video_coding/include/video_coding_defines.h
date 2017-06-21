@@ -15,10 +15,10 @@
 #include <vector>
 
 #include "webrtc/api/video/video_frame.h"
+// For EncodedImage
+#include "webrtc/common_video/include/video_frame.h"
 #include "webrtc/modules/include/module_common_types.h"
 #include "webrtc/typedefs.h"
-// For EncodedImage
-#include "webrtc/video_frame.h"
 
 namespace webrtc {
 
@@ -39,7 +39,14 @@ namespace webrtc {
 #define VCM_NO_FRAME_DECODED -11
 #define VCM_NOT_IMPLEMENTED -20
 
-enum { kDefaultStartBitrateKbps = 300 };
+enum {
+  kDefaultStartBitrateKbps = 300,
+  // Timing frames settings. Timing frames are sent every
+  // |kDefaultTimingFramesDelayMs|, or if the frame is at least
+  // |kDefaultOutliserFrameSizePercent| in size of average frame.
+  kDefaultTimingFramesDelayMs = 200,
+  kDefaultOutlierFrameSizePercent = 250,
+};
 
 enum VCMVideoProtection {
   kProtectionNone,
@@ -61,17 +68,10 @@ struct VCMFrameCount {
 // rendered.
 class VCMReceiveCallback {
  public:
-  // TODO(ilnik): Once deprecation is complete, change this to pure virtual.
   virtual int32_t FrameToRender(VideoFrame& videoFrame,  // NOLINT
                                 rtc::Optional<uint8_t> qp,
-                                VideoContentType /*content_type*/) {
-    return FrameToRender(videoFrame, qp);
-  }
-  // DEPRECATED. Use the other overloaded version.
-  virtual int32_t FrameToRender(VideoFrame& videoFrame,  // NOLINT
-                                rtc::Optional<uint8_t> qp) {
-    return -1;
-  }
+                                VideoContentType /*content_type*/) = 0;
+
   virtual int32_t ReceivedDecodedReferenceFrame(const uint64_t pictureId) {
     return -1;
   }

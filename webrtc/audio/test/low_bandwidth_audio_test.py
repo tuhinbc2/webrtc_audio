@@ -57,7 +57,7 @@ def _GetPlatform():
 
 
 def _DownloadTools():
-  tools_dir = os.path.join(SRC_DIR, 'tools-webrtc')
+  tools_dir = os.path.join(SRC_DIR, 'tools_webrtc')
   toolchain_dir = os.path.join(tools_dir, 'audio_quality')
 
   # Download PESQ and POLQA.
@@ -198,7 +198,7 @@ def main():
     test_process = subprocess.Popen(
         _LogCommand(test_command + ['--sample_rate_hz=%d' %
                                     analyzer.sample_rate_hz]),
-        stdout=subprocess.PIPE)
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     try:
       lines = iter(test_process.stdout.readline, '')
       for result in ExtractTestRuns(lines, echo=True):

@@ -168,34 +168,34 @@ VideoCodec CreateDecoderVideoCodec(const VideoReceiveStream::Decoder& decoder) {
 
 namespace internal {
 
-VideoReceiveStream::VideoReceiveStream(
-    int num_cpu_cores,
-    PacketRouter* packet_router,
-    VideoReceiveStream::Config config,
-    ProcessThread* process_thread,
-    CallStats* call_stats,
-    VieRemb* remb)
+VideoReceiveStream::VideoReceiveStream(int num_cpu_cores,
+                                       PacketRouter* packet_router,
+                                       VideoReceiveStream::Config config,
+                                       ProcessThread* process_thread,
+                                       CallStats* call_stats)
     : transport_adapter_(config.rtcp_send_transport),
       config_(std::move(config)),
       num_cpu_cores_(num_cpu_cores),
       process_thread_(process_thread),
       clock_(Clock::GetRealTimeClock()),
-      decode_thread_(DecodeThreadFunction, this, "DecodingThread"),
+      decode_thread_(&DecodeThreadFunction,
+                     this,
+                     "DecodingThread",
+                     rtc::kHighestPriority),
       call_stats_(call_stats),
       timing_(new VCMTiming(clock_)),
       video_receiver_(clock_, nullptr, this, timing_.get(), this, this),
       stats_proxy_(&config_, clock_),
-      rtp_stream_receiver_(&transport_adapter_,
-                           call_stats_->rtcp_rtt_stats(),
-                           packet_router,
-                           remb,
-                           &config_,
-                           &stats_proxy_,
-                           process_thread_,
-                           this,  // NackSender
-                           this,  // KeyFrameRequestSender
-                           this,  // OnCompleteFrameCallback
-                           timing_.get()),
+      rtp_video_stream_receiver_(&transport_adapter_,
+                                 call_stats_->rtcp_rtt_stats(),
+                                 packet_router,
+                                 &config_,
+                                 &stats_proxy_,
+                                 process_thread_,
+                                 this,  // NackSender
+                                 this,  // KeyFrameRequestSender
+                                 this,  // OnCompleteFrameCallback
+                                 timing_.get()),
       rtp_stream_sync_(this) {
   LOG(LS_INFO) << "VideoReceiveStream: " << config_.ToString();
 
@@ -221,7 +221,6 @@ VideoReceiveStream::VideoReceiveStream(
   frame_buffer_.reset(new video_coding::FrameBuffer(
       clock_, jitter_estimator_.get(), timing_.get(), &stats_proxy_));
 
-  process_thread_->RegisterModule(&video_receiver_, RTC_FROM_HERE);
   process_thread_->RegisterModule(&rtp_stream_sync_, RTC_FROM_HERE);
 }
 
@@ -231,26 +230,19 @@ VideoReceiveStream::~VideoReceiveStream() {
   Stop();
 
   process_thread_->DeRegisterModule(&rtp_stream_sync_);
-  process_thread_->DeRegisterModule(&video_receiver_);
 }
 
 void VideoReceiveStream::SignalNetworkState(NetworkState state) {
   RTC_DCHECK_RUN_ON(&worker_thread_checker_);
-  rtp_stream_receiver_.SignalNetworkState(state);
+  rtp_video_stream_receiver_.SignalNetworkState(state);
 }
 
-
 bool VideoReceiveStream::DeliverRtcp(const uint8_t* packet, size_t length) {
-  return rtp_stream_receiver_.DeliverRtcp(packet, length);
+  return rtp_video_stream_receiver_.DeliverRtcp(packet, length);
 }
 
 void VideoReceiveStream::OnRtpPacket(const RtpPacketReceived& packet) {
-  rtp_stream_receiver_.OnRtpPacket(packet);
-}
-
-bool VideoReceiveStream::OnRecoveredPacket(const uint8_t* packet,
-                                           size_t length) {
-  return rtp_stream_receiver_.OnRecoveredPacket(packet, length);
+  rtp_video_stream_receiver_.OnRtpPacket(packet);
 }
 
 void VideoReceiveStream::SetSync(Syncable* audio_syncable) {
@@ -264,12 +256,13 @@ void VideoReceiveStream::Start() {
     return;
 
   bool protected_by_fec = config_.rtp.protected_by_flexfec ||
-                          rtp_stream_receiver_.IsUlpfecEnabled();
+                          rtp_video_stream_receiver_.IsUlpfecEnabled();
 
   frame_buffer_->Start();
-  call_stats_->RegisterStatsObserver(&rtp_stream_receiver_);
+  call_stats_->RegisterStatsObserver(&rtp_video_stream_receiver_);
 
-  if (rtp_stream_receiver_.IsRetransmissionsEnabled() && protected_by_fec) {
+  if (rtp_video_stream_receiver_.IsRetransmissionsEnabled() &&
+      protected_by_fec) {
     frame_buffer_->SetProtectionMode(kProtectionNackFEC);
   }
 
@@ -290,36 +283,41 @@ void VideoReceiveStream::Start() {
     video_receiver_.RegisterExternalDecoder(decoder.decoder,
                                             decoder.payload_type);
     VideoCodec codec = CreateDecoderVideoCodec(decoder);
-    RTC_CHECK(
-        rtp_stream_receiver_.AddReceiveCodec(codec, decoder.codec_params));
+    RTC_CHECK(rtp_video_stream_receiver_.AddReceiveCodec(codec,
+                                                         decoder.codec_params));
     RTC_CHECK_EQ(VCM_OK, video_receiver_.RegisterReceiveCodec(
                              &codec, num_cpu_cores_, false));
   }
 
   video_stream_decoder_.reset(new VideoStreamDecoder(
-      &video_receiver_, &rtp_stream_receiver_, &rtp_stream_receiver_,
-      rtp_stream_receiver_.IsRetransmissionsEnabled(), protected_by_fec,
+      &video_receiver_, &rtp_video_stream_receiver_,
+      &rtp_video_stream_receiver_,
+      rtp_video_stream_receiver_.IsRetransmissionsEnabled(), protected_by_fec,
       &stats_proxy_, renderer));
   // Register the channel to receive stats updates.
   call_stats_->RegisterStatsObserver(video_stream_decoder_.get());
+
+  process_thread_->RegisterModule(&video_receiver_, RTC_FROM_HERE);
+
   // Start the decode thread
   decode_thread_.Start();
-  decode_thread_.SetPriority(rtc::kHighestPriority);
-  rtp_stream_receiver_.StartReceive();
+  rtp_video_stream_receiver_.StartReceive();
 }
 
 void VideoReceiveStream::Stop() {
   RTC_DCHECK_RUN_ON(&worker_thread_checker_);
-  rtp_stream_receiver_.StopReceive();
-  // TriggerDecoderShutdown will release any waiting decoder thread and make it
-  // stop immediately, instead of waiting for a timeout. Needs to be called
-  // before joining the decoder thread thread.
-  video_receiver_.TriggerDecoderShutdown();
+  rtp_video_stream_receiver_.StopReceive();
 
   frame_buffer_->Stop();
-  call_stats_->DeregisterStatsObserver(&rtp_stream_receiver_);
+  call_stats_->DeregisterStatsObserver(&rtp_video_stream_receiver_);
+  process_thread_->DeRegisterModule(&video_receiver_);
 
   if (decode_thread_.IsRunning()) {
+    // TriggerDecoderShutdown will release any waiting decoder thread and make
+    // it stop immediately, instead of waiting for a timeout. Needs to be called
+    // before joining the decoder thread.
+    video_receiver_.TriggerDecoderShutdown();
+
     decode_thread_.Stop();
     // Deregister external decoders so they are no longer running during
     // destruction. This effectively stops the VCM since the decoder thread is
@@ -410,18 +408,18 @@ EncodedImageCallback::Result VideoReceiveStream::OnEncodedImage(
 
 void VideoReceiveStream::SendNack(
     const std::vector<uint16_t>& sequence_numbers) {
-  rtp_stream_receiver_.RequestPacketRetransmit(sequence_numbers);
+  rtp_video_stream_receiver_.RequestPacketRetransmit(sequence_numbers);
 }
 
 void VideoReceiveStream::RequestKeyFrame() {
-  rtp_stream_receiver_.RequestKeyFrame();
+  rtp_video_stream_receiver_.RequestKeyFrame();
 }
 
 void VideoReceiveStream::OnCompleteFrame(
     std::unique_ptr<video_coding::FrameObject> frame) {
   int last_continuous_pid = frame_buffer_->InsertFrame(std::move(frame));
   if (last_continuous_pid != -1)
-    rtp_stream_receiver_.FrameContinuous(last_continuous_pid);
+    rtp_video_stream_receiver_.FrameContinuous(last_continuous_pid);
 }
 
 int VideoReceiveStream::id() const {
@@ -433,14 +431,14 @@ rtc::Optional<Syncable::Info> VideoReceiveStream::GetInfo() const {
   RTC_DCHECK_RUN_ON(&module_process_thread_checker_);
   Syncable::Info info;
 
-  RtpReceiver* rtp_receiver = rtp_stream_receiver_.GetRtpReceiver();
+  RtpReceiver* rtp_receiver = rtp_video_stream_receiver_.GetRtpReceiver();
   RTC_DCHECK(rtp_receiver);
   if (!rtp_receiver->Timestamp(&info.latest_received_capture_timestamp))
     return rtc::Optional<Syncable::Info>();
   if (!rtp_receiver->LastReceivedTimeMs(&info.latest_receive_time_ms))
     return rtc::Optional<Syncable::Info>();
 
-  RtpRtcp* rtp_rtcp = rtp_stream_receiver_.rtp_rtcp();
+  RtpRtcp* rtp_rtcp = rtp_video_stream_receiver_.rtp_rtcp();
   RTC_DCHECK(rtp_rtcp);
   if (rtp_rtcp->RemoteNTP(&info.capture_time_ntp_secs,
                           &info.capture_time_ntp_frac,
@@ -464,8 +462,9 @@ void VideoReceiveStream::SetMinimumPlayoutDelay(int delay_ms) {
   video_receiver_.SetMinimumPlayoutDelay(delay_ms);
 }
 
-bool VideoReceiveStream::DecodeThreadFunction(void* ptr) {
-  return static_cast<VideoReceiveStream*>(ptr)->Decode();
+void VideoReceiveStream::DecodeThreadFunction(void* ptr) {
+  while (static_cast<VideoReceiveStream*>(ptr)->Decode()) {
+  }
 }
 
 bool VideoReceiveStream::Decode() {
@@ -481,12 +480,33 @@ bool VideoReceiveStream::Decode() {
   }
 
   if (frame) {
+    RTC_DCHECK_EQ(res, video_coding::FrameBuffer::ReturnReason::kFrameFound);
     if (video_receiver_.Decode(frame.get()) == VCM_OK)
-      rtp_stream_receiver_.FrameDecoded(frame->picture_id);
+      rtp_video_stream_receiver_.FrameDecoded(frame->picture_id);
   } else {
-    LOG(LS_WARNING) << "No decodable frame in " << kMaxWaitForFrameMs
-                    << " ms, requesting keyframe.";
-    RequestKeyFrame();
+    RTC_DCHECK_EQ(res, video_coding::FrameBuffer::ReturnReason::kTimeout);
+    int64_t now_ms = clock_->TimeInMilliseconds();
+    rtc::Optional<int64_t> last_packet_ms =
+        rtp_video_stream_receiver_.LastReceivedPacketMs();
+    rtc::Optional<int64_t> last_keyframe_packet_ms =
+        rtp_video_stream_receiver_.LastReceivedKeyframePacketMs();
+
+    // To avoid spamming keyframe requests for a stream that is not active we
+    // check if we have received a packet within the last 5 seconds.
+    bool stream_is_active = last_packet_ms && now_ms - *last_packet_ms < 5000;
+
+    // If we recently (within |kMaxWaitForFrameMs|) have been receiving packets
+    // belonging to a keyframe then we assume a keyframe is being received right
+    // now.
+    bool receiving_keyframe =
+        last_keyframe_packet_ms &&
+        now_ms - *last_keyframe_packet_ms < kMaxWaitForFrameMs;
+
+    if (stream_is_active && !receiving_keyframe) {
+      LOG(LS_WARNING) << "No decodable frame in " << kMaxWaitForFrameMs
+                      << " ms, requesting keyframe.";
+      RequestKeyFrame();
+    }
   }
   return true;
 }
