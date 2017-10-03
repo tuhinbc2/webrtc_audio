@@ -7,6 +7,10 @@
  *  in the file PATENTS.  All contributing project authors may
  *  be found in the AUTHORS file in the root of the source tree.
  */
+#ifdef CANTREMEMBER
+#define VAR_NAME_VALUE(var) #var "="  VALUE(var)
+#pragma message(VAR_NAME_VALUE(##name##)))
+#endif
 
 #ifndef WEBRTC_BASE_CHECKS_H_
 #define WEBRTC_BASE_CHECKS_H_
@@ -117,11 +121,12 @@ namespace rtc {
 //
 // TODO(akalin): Rewrite this so that constructs like if (...)
 // RTC_CHECK_EQ(...) else { ... } work properly.
+#ifndef _WIN32
 #define RTC_CHECK_OP(name, op, val1, val2)                                 \
   if (std::string* _result =                                               \
           rtc::Check##name##Impl((val1), (val2), #val1 " " #op " " #val2)) \
     rtc::FatalMessage(__FILE__, __LINE__, _result).stream()
-
+#endif
 // Build the error message string.  This is separate from the "Impl"
 // function template because it is not performance critical and so can
 // be out of line, while the "Impl" code should be inline.  Caller
@@ -173,20 +178,24 @@ std::string* MakeCheckOpString<std::string, std::string>(
     else                                                                     \
       return rtc::MakeCheckOpString(v1, v2, names);                          \
   }
+#ifndef _WIN32
 DEFINE_RTC_CHECK_OP_IMPL(Eq)
 DEFINE_RTC_CHECK_OP_IMPL(Ne)
 DEFINE_RTC_CHECK_OP_IMPL(Le)
 DEFINE_RTC_CHECK_OP_IMPL(Lt)
 DEFINE_RTC_CHECK_OP_IMPL(Ge)
 DEFINE_RTC_CHECK_OP_IMPL(Gt)
+#endif
 #undef DEFINE_RTC_CHECK_OP_IMPL
 
+#ifndef _WIN32
 #define RTC_CHECK_EQ(val1, val2) RTC_CHECK_OP(Eq, ==, val1, val2)
 #define RTC_CHECK_NE(val1, val2) RTC_CHECK_OP(Ne, !=, val1, val2)
 #define RTC_CHECK_LE(val1, val2) RTC_CHECK_OP(Le, <=, val1, val2)
 #define RTC_CHECK_LT(val1, val2) RTC_CHECK_OP(Lt, <, val1, val2)
 #define RTC_CHECK_GE(val1, val2) RTC_CHECK_OP(Ge, >=, val1, val2)
 #define RTC_CHECK_GT(val1, val2) RTC_CHECK_OP(Gt, >, val1, val2)
+#endif
 
 // The RTC_DCHECK macro is equivalent to RTC_CHECK except that it only generates
 // code in debug builds. It does reference the condition parameter in all cases,
@@ -263,12 +272,14 @@ inline T CheckedDivExact(T a, T b) {
     }                                                                    \
   } while (0)
 
+#ifndef _WIN32
 #define RTC_CHECK_EQ(a, b) RTC_CHECK((a) == (b))
 #define RTC_CHECK_NE(a, b) RTC_CHECK((a) != (b))
 #define RTC_CHECK_LE(a, b) RTC_CHECK((a) <= (b))
 #define RTC_CHECK_LT(a, b) RTC_CHECK((a) < (b))
 #define RTC_CHECK_GE(a, b) RTC_CHECK((a) >= (b))
 #define RTC_CHECK_GT(a, b) RTC_CHECK((a) > (b))
+#endif
 
 #define RTC_DCHECK(condition)                                             \
   do {                                                                    \

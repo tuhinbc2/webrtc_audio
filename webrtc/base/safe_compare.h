@@ -31,6 +31,7 @@
 #ifndef WEBRTC_BASE_SAFE_COMPARE_H_
 #define WEBRTC_BASE_SAFE_COMPARE_H_
 
+#ifndef _WIN32
 #include <stddef.h>
 #include <stdint.h>
 
@@ -175,5 +176,7 @@ RTC_SAFECMP_MAKE_FUN(Ge)
 
 }  // namespace safe_cmp
 }  // namespace rtc
+
+#endif
 
 #endif  // WEBRTC_BASE_SAFE_COMPARE_H_
