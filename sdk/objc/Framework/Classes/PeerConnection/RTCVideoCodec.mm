@@ -14,6 +14,12 @@
 #import "RTCVideoCodec+Private.h"
 #import "WebRTC/RTCVideoCodecFactory.h"
 
+NSString *const kRTCVideoCodecVp8Name = @"VP8";
+NSString *const kRTCVideoCodecVp9Name = @"VP9";
+NSString *const kRTCVideoCodecH264Name = @"H264";
+NSString *const kRTCLevel31ConstrainedHigh = @"640c1f";
+NSString *const kRTCLevel31ConstrainedBaseline = @"42e01f";
+
 @implementation RTCVideoCodecInfo
 
 @synthesize name = _name;
@@ -87,6 +93,18 @@
   }
 
   return codec;
+}
+
+#pragma mark - NSCoding
+
+- (instancetype)initWithCoder:(NSCoder *)decoder {
+  return [self initWithName:[decoder decodeObjectForKey:@"name"]
+                 parameters:[decoder decodeObjectForKey:@"parameters"]];
+}
+
+- (void)encodeWithCoder:(NSCoder *)encoder {
+  [encoder encodeObject:_name forKey:@"name"];
+  [encoder encodeObject:_parameters forKey:@"parameters"];
 }
 
 @end

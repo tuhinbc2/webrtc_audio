@@ -154,8 +154,6 @@ rtc_static_library("peerconnection") {
     "videotracksource.h",
     "webrtcsdp.cc",
     "webrtcsdp.h",
-    "webrtcsession.cc",
-    "webrtcsession.h",
     "webrtcsessiondescriptionfactory.cc",
     "webrtcsessiondescriptionfactory.h",
   ]
@@ -205,8 +203,6 @@ rtc_static_library("create_pc_factory") {
     "../api:audio_mixer_api",
     "../api:libjingle_peerconnection_api",
     "../api/audio_codecs:audio_codecs_api",
-    "../api/audio_codecs:builtin_audio_decoder_factory",
-    "../api/audio_codecs:builtin_audio_encoder_factory",
     "../api/video_codecs:video_codecs_api",
     "../call",
     "../call:call_interfaces",
@@ -232,19 +228,6 @@ rtc_source_set("libjingle_peerconnection") {
     ":peerconnection",
     "../api:libjingle_peerconnection_api",
   ]
-
-  if (rtc_use_quic) {
-    sources += [
-      "quicdatachannel.cc",
-      "quicdatachannel.h",
-      "quicdatatransport.cc",
-      "quicdatatransport.h",
-    ]
-    deps += [ "//third_party/libquic" ]
-    public_deps = [
-      "//third_party/libquic",
-    ]
-  }
 }
 
 if (rtc_include_tests) {
@@ -324,12 +307,12 @@ if (rtc_include_tests) {
       "test/fakedatachannelprovider.h",
       "test/fakeperiodicvideocapturer.h",
       "test/fakertccertificategenerator.h",
+      "test/fakesctptransport.h",
       "test/faketransportcontroller.h",
       "test/fakevideotrackrenderer.h",
       "test/fakevideotracksource.h",
       "test/mock_datachannel.h",
       "test/mock_peerconnection.h",
-      "test/mock_webrtcsession.h",
       "test/mockpeerconnectionobservers.h",
       "test/peerconnectiontestwrapper.cc",
       "test/peerconnectiontestwrapper.h",
@@ -391,9 +374,14 @@ if (rtc_include_tests) {
       "localaudiosource_unittest.cc",
       "mediaconstraintsinterface_unittest.cc",
       "mediastream_unittest.cc",
+      "peerconnection_bundle_unittest.cc",
       "peerconnection_crypto_unittest.cc",
+      "peerconnection_datachannel_unittest.cc",
+      "peerconnection_ice_unittest.cc",
       "peerconnection_integrationtest.cc",
+      "peerconnection_media_unittest.cc",
       "peerconnection_rtp_unittest.cc",
+      "peerconnection_signaling_unittest.cc",
       "peerconnectionendtoend_unittest.cc",
       "peerconnectionfactory_unittest.cc",
       "peerconnectioninterface_unittest.cc",
@@ -411,7 +399,6 @@ if (rtc_include_tests) {
       "videocapturertracksource_unittest.cc",
       "videotrack_unittest.cc",
       "webrtcsdp_unittest.cc",
-      "webrtcsession_unittest.cc",
     ]
 
     if (rtc_enable_sctp) {
@@ -435,16 +422,6 @@ if (rtc_include_tests) {
       ]
     }
 
-    if (rtc_use_quic) {
-      public_deps = [
-        "//third_party/libquic",
-      ]
-      sources += [
-        "quicdatachannel_unittest.cc",
-        "quicdatatransport_unittest.cc",
-      ]
-    }
-
     deps = []
     if (is_android) {
       deps += [ ":android_black_magic" ]
@@ -457,8 +434,14 @@ if (rtc_include_tests) {
       "../api:fakemetricsobserver",
       "../api:libjingle_peerconnection_test_api",
       "../api:rtc_stats_api",
+      "../api/audio_codecs:audio_codecs_api",
       "../api/audio_codecs:builtin_audio_decoder_factory",
       "../api/audio_codecs:builtin_audio_encoder_factory",
+      "../api/audio_codecs/L16:audio_decoder_L16",
+      "../api/audio_codecs/L16:audio_encoder_L16",
+      "../call:call_interfaces",
+      "../logging:rtc_event_log_api",
+      "../logging:rtc_event_log_impl",
       "../media:rtc_audio_video",
       "../media:rtc_data",  # TODO(phoglund): AFAIK only used for one sctp constant.
       "../media:rtc_media_base",

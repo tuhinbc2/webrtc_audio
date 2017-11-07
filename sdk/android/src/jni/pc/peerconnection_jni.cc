@@ -110,8 +110,7 @@ JNI_FUNCTION_DECLARATION(jobject,
                                      nativeChannelPtr);
   CHECK_EXCEPTION(jni) << "error during NewObject";
   // Channel is now owned by Java object, and will be freed from there.
-  int bumped_count = channel->AddRef();
-  RTC_CHECK(bumped_count == 2) << "Unexpected refcount";
+  channel->AddRef();
   return j_channel;
 }
 
@@ -165,6 +164,22 @@ JNI_FUNCTION_DECLARATION(void,
       new rtc::RefCountedObject<SetSdpObserverJni>(jni, j_observer, nullptr));
   ExtractNativePC(jni, j_pc)->SetRemoteDescription(
       observer, JavaToNativeSessionDescription(jni, j_sdp));
+}
+
+JNI_FUNCTION_DECLARATION(void,
+                         PeerConnection_setAudioPlayout,
+                         JNIEnv* jni,
+                         jobject j_pc,
+                         jboolean playout) {
+  ExtractNativePC(jni, j_pc)->SetAudioPlayout(playout);
+}
+
+JNI_FUNCTION_DECLARATION(void,
+                         PeerConnection_setAudioRecording,
+                         JNIEnv* jni,
+                         jobject j_pc,
+                         jboolean recording) {
+  ExtractNativePC(jni, j_pc)->SetAudioRecording(recording);
 }
 
 JNI_FUNCTION_DECLARATION(jboolean,

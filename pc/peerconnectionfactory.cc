@@ -20,6 +20,7 @@
 #include "api/turncustomizer.h"
 #include "api/videosourceproxy.h"
 #include "logging/rtc_event_log/rtc_event_log.h"
+#include "media/sctp/sctptransport.h"
 #include "rtc_base/bind.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/ptr_util.h"
@@ -105,7 +106,7 @@ PeerConnectionFactory::PeerConnectionFactory(
     }
   }
 
-  // TODO: Currently there is no way creating an external adm in
+  // TODO(deadbeef): Currently there is no way to create an external adm in
   // libjingle source tree. So we can 't currently assert if this is NULL.
   // RTC_DCHECK(default_adm != NULL);
 }
@@ -295,6 +296,15 @@ cricket::TransportController* PeerConnectionFactory::CreateTransportController(
   return new cricket::TransportController(
       signaling_thread_, network_thread_, port_allocator,
       redetermine_role_on_ice_restart, options_.crypto_options);
+}
+
+std::unique_ptr<cricket::SctpTransportInternalFactory>
+PeerConnectionFactory::CreateSctpTransportInternalFactory() {
+#ifdef HAVE_SCTP
+  return rtc::MakeUnique<cricket::SctpTransportFactory>(network_thread());
+#else
+  return nullptr;
+#endif
 }
 
 cricket::ChannelManager* PeerConnectionFactory::channel_manager() {

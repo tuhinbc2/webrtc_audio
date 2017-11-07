@@ -25,8 +25,7 @@ const size_t kPlayoutBufferSize =
 const size_t kRecordingBufferSize =
     kRecordingFixedSampleRate / 100 * kRecordingNumChannels * 2;
 
-FileAudioDevice::FileAudioDevice(const int32_t id,
-                                 const char* inputFilename,
+FileAudioDevice::FileAudioDevice(const char* inputFilename,
                                  const char* outputFilename):
     _ptrAudioBuffer(NULL),
     _recordingBuffer(NULL),
@@ -395,8 +394,6 @@ int32_t FileAudioDevice::StereoRecording(bool& enabled) const {
 int32_t FileAudioDevice::PlayoutDelay(uint16_t& delayMS) const {
   return 0;
 }
-
-int32_t FileAudioDevice::RecordingDelay(uint16_t& delayMS) const { return -1; }
 
 void FileAudioDevice::AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) {
   rtc::CritScope lock(&_critSect);

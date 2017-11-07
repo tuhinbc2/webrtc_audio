@@ -22,8 +22,8 @@ namespace test {
 class MockAudioDeviceModule : public AudioDeviceModule {
  public:
   // RefCounted
-  MOCK_CONST_METHOD0(AddRef, int32_t());
-  MOCK_CONST_METHOD0(Release, int32_t());
+  MOCK_CONST_METHOD0(AddRef, void());
+  MOCK_CONST_METHOD0(Release, rtc::RefCountReleaseStatus());
   // AudioDeviceModule.
   MOCK_CONST_METHOD1(ActiveAudioLayer, int32_t(AudioLayer* audioLayer));
   MOCK_CONST_METHOD0(LastError, ErrorCode());
@@ -86,7 +86,6 @@ class MockAudioDeviceModule : public AudioDeviceModule {
   MOCK_METHOD1(SetRecordingChannel, int32_t(const ChannelType channel));
   MOCK_CONST_METHOD1(RecordingChannel, int32_t(ChannelType* channel));
   MOCK_CONST_METHOD1(PlayoutDelay, int32_t(uint16_t* delayMS));
-  MOCK_CONST_METHOD1(RecordingDelay, int32_t(uint16_t* delayMS));
   MOCK_METHOD1(SetRecordingSampleRate, int32_t(const uint32_t samplesPerSec));
   MOCK_CONST_METHOD1(RecordingSampleRate, int32_t(uint32_t* samplesPerSec));
   MOCK_METHOD1(SetPlayoutSampleRate, int32_t(const uint32_t samplesPerSec));

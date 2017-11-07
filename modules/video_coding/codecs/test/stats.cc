@@ -66,6 +66,8 @@ void Stats::PrintSummary() const {
     return;
   }
 
+  printf("Encode/decode statistics\n==\n");
+
   // Calculate min, max, average and total encoding time.
   int total_encoding_time_us = 0;
   int total_decoding_time_us = 0;
@@ -74,6 +76,7 @@ void Stats::PrintSummary() const {
   size_t total_encoded_delta_frame_size_bytes = 0;
   size_t num_key_frames = 0;
   size_t num_delta_frames = 0;
+  int num_encode_failures = 0;
 
   for (const FrameStatistic& stat : stats_) {
     total_encoding_time_us += stat.encode_time_us;
@@ -86,9 +89,13 @@ void Stats::PrintSummary() const {
       total_encoded_delta_frame_size_bytes += stat.encoded_frame_size_bytes;
       ++num_delta_frames;
     }
+    if (stat.encode_return_code != 0) {
+      ++num_encode_failures;
+    }
   }
 
   // Encoding stats.
+  printf("# Encoded frame failures: %d\n", num_encode_failures);
   printf("Encoding time:\n");
   auto frame_it =
       std::min_element(stats_.begin(), stats_.end(), LessForEncodeTime);
@@ -174,6 +181,7 @@ void Stats::PrintSummary() const {
   }
   int avg_qp = (total_qp_count > 0) ? (total_qp / total_qp_count) : -1;
   printf("Average QP: %d\n", avg_qp);
+  printf("\n");
 }
 
 }  // namespace test

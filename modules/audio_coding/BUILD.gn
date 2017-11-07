@@ -22,14 +22,12 @@ if (rtc_include_ilbc) {
 if (rtc_include_opus) {
   audio_codec_deps += [ ":webrtc_opus" ]
 }
-if (!build_with_mozilla) {
-  if (current_cpu == "arm") {
-    audio_codec_deps += [ ":isac_fix" ]
-  } else {
-    audio_codec_deps += [ ":isac" ]
-  }
-  audio_codec_deps += [ ":g722" ]
+if (current_cpu == "arm") {
+  audio_codec_deps += [ ":isac_fix" ]
+} else {
+  audio_codec_deps += [ ":isac" ]
 }
+audio_codec_deps += [ ":g722" ]
 if (!build_with_mozilla && !build_with_chromium) {
   audio_codec_deps += [ ":red" ]
 }
@@ -938,8 +936,6 @@ rtc_static_library("neteq") {
   sources = [
     "neteq/accelerate.cc",
     "neteq/accelerate.h",
-    "neteq/audio_decoder_impl.cc",
-    "neteq/audio_decoder_impl.h",
     "neteq/audio_multi_vector.cc",
     "neteq/audio_multi_vector.h",
     "neteq/audio_vector.cc",
@@ -1012,10 +1008,7 @@ rtc_static_library("neteq") {
   deps = [
     ":audio_coding_module_typedefs",
     ":cng",
-    ":g711",
-    ":isac_fix",
     ":neteq_decoder_enum",
-    ":pcm16b",
     "..:module_api",
     "../..:webrtc_common",
     "../../api:optional",
@@ -1025,28 +1018,6 @@ rtc_static_library("neteq") {
     "../../rtc_base:rtc_base_approved",
     "../../system_wrappers",
   ]
-
-  defines = []
-
-  if (rtc_include_ilbc) {
-    defines += [ "WEBRTC_CODEC_ILBC" ]
-    deps += [ ":ilbc" ]
-  }
-  if (rtc_include_opus) {
-    defines += [ "WEBRTC_CODEC_OPUS" ]
-    deps += [ ":webrtc_opus" ]
-  }
-  if (!build_with_mozilla) {
-    if (current_cpu == "arm") {
-      defines += [ "WEBRTC_CODEC_ISACFX" ]
-      deps += [ ":isac_fix" ]
-    } else {
-      defines += [ "WEBRTC_CODEC_ISAC" ]
-      deps += [ ":isac" ]
-    }
-    defines += [ "WEBRTC_CODEC_G722" ]
-    deps += [ ":g722" ]
-  }
 }
 
 # Although providing only test support, this target must be outside of the
@@ -1143,14 +1114,10 @@ rtc_source_set("neteq_tools") {
   sources = [
     "neteq/tools/fake_decode_from_file.cc",
     "neteq/tools/fake_decode_from_file.h",
-    "neteq/tools/input_audio_file.cc",
-    "neteq/tools/input_audio_file.h",
     "neteq/tools/neteq_delay_analyzer.cc",
     "neteq/tools/neteq_delay_analyzer.h",
     "neteq/tools/neteq_replacement_input.cc",
     "neteq/tools/neteq_replacement_input.h",
-    "neteq/tools/resample_input_audio_file.cc",
-    "neteq/tools/resample_input_audio_file.h",
   ]
 
   public_configs = [ ":neteq_tools_config" ]
@@ -1165,13 +1132,28 @@ rtc_source_set("neteq_tools") {
     "../../api:array_view",
     "../../api:optional",
     "../../api/audio_codecs:audio_codecs_api",
-    "../../common_audio",
     "../../rtc_base:rtc_base_approved",
     "../rtp_rtcp",
   ]
 
   public_deps = [
+    ":neteq_input_audio_tools",
     ":neteq_tools_minimal",
+  ]
+}
+
+rtc_source_set("neteq_input_audio_tools") {
+  sources = [
+    "neteq/tools/input_audio_file.cc",
+    "neteq/tools/input_audio_file.h",
+    "neteq/tools/resample_input_audio_file.cc",
+    "neteq/tools/resample_input_audio_file.h",
+  ]
+
+  deps = [
+    "../..:webrtc_common",
+    "../../common_audio",
+    "../../rtc_base:rtc_base_approved",
   ]
 }
 
@@ -1323,8 +1305,8 @@ if (rtc_include_tests) {
     deps = [
       ":neteq_test_support",
       ":neteq_test_tools",
-      ":webrtc_opus",
       "../..:webrtc_common",
+      "../../api/audio_codecs/opus:audio_encoder_opus",
       "../../rtc_base:protobuf_utils",
       "../../rtc_base:rtc_base_approved",
       "../../system_wrappers:system_wrappers",
@@ -2176,6 +2158,7 @@ if (rtc_include_tests) {
       "../../api/audio_codecs:audio_codecs_api",
       "../../api/audio_codecs:builtin_audio_decoder_factory",
       "../../api/audio_codecs:builtin_audio_encoder_factory",
+      "../../api/audio_codecs/opus:audio_encoder_opus",
       "../../common_audio",
       "../../common_audio:mock_common_audio",
       "../../logging:rtc_event_log_api",

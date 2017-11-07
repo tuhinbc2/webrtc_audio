@@ -30,9 +30,12 @@
 #include "modules/audio_coding/neteq/tools/neteq_replacement_input.h"
 #include "modules/audio_coding/neteq/tools/neteq_test.h"
 #include "modules/audio_coding/neteq/tools/resample_input_audio_file.h"
+#include "modules/congestion_controller/acknowledged_bitrate_estimator.h"
+#include "modules/congestion_controller/bitrate_estimator.h"
 #include "modules/congestion_controller/include/receive_side_congestion_controller.h"
 #include "modules/congestion_controller/include/send_side_congestion_controller.h"
 #include "modules/include/module_common_types.h"
+#include "modules/pacing/packet_router.h"
 #include "modules/rtp_rtcp/include/rtp_rtcp.h"
 #include "modules/rtp_rtcp/include/rtp_rtcp_defines.h"
 #include "modules/rtp_rtcp/source/rtcp_packet/common_header.h"
@@ -45,8 +48,13 @@
 #include "rtc_base/checks.h"
 #include "rtc_base/format_macros.h"
 #include "rtc_base/logging.h"
+#include "rtc_base/numerics/sequence_number_util.h"
 #include "rtc_base/ptr_util.h"
 #include "rtc_base/rate_statistics.h"
+
+#ifndef BWE_TEST_LOGGING_COMPILE_TIME_ENABLE
+#define BWE_TEST_LOGGING_COMPILE_TIME_ENABLE 0
+#endif  // BWE_TEST_LOGGING_COMPILE_TIME_ENABLE
 
 namespace webrtc {
 namespace plotting {
@@ -590,6 +598,46 @@ std::string EventLogAnalyzer::GetStreamName(StreamId stream_id) const {
   return name.str();
 }
 
+// This is much more reliable for outgoing streams than for incoming streams.
+rtc::Optional<uint32_t> EventLogAnalyzer::EstimateRtpClockFrequency(
+    const std::vector<LoggedRtpPacket>& packets) const {
+  RTC_CHECK(packets.size() >= 2);
+  uint64_t end_time_us = log_segments_.empty()
+                             ? std::numeric_limits<uint64_t>::max()
+                             : log_segments_.front().second;
+  SeqNumUnwrapper<uint32_t> unwrapper;
+  uint64_t first_rtp_timestamp = unwrapper.Unwrap(packets[0].header.timestamp);
+  uint64_t first_log_timestamp = packets[0].timestamp;
+  uint64_t last_rtp_timestamp = first_rtp_timestamp;
+  uint64_t last_log_timestamp = first_log_timestamp;
+  for (size_t i = 1; i < packets.size(); i++) {
+    if (packets[i].timestamp > end_time_us)
+      break;
+    last_rtp_timestamp = unwrapper.Unwrap(packets[i].header.timestamp);
+    last_log_timestamp = packets[i].timestamp;
+  }
+  if (last_log_timestamp - first_log_timestamp < 1000000) {
+    LOG(LS_WARNING)
+        << "Failed to estimate RTP clock frequency: Stream too short. ("
+        << packets.size() << " packets, "
+        << last_log_timestamp - first_log_timestamp << " us)";
+    return rtc::Optional<uint32_t>();
+  }
+  double duration =
+      static_cast<double>(last_log_timestamp - first_log_timestamp) / 1000000;
+  double estimated_frequency =
+      (last_rtp_timestamp - first_rtp_timestamp) / duration;
+  for (uint32_t f : {8000, 16000, 32000, 48000, 90000}) {
+    if (std::fabs(estimated_frequency - f) < 0.05 * f) {
+      return rtc::Optional<uint32_t>(f);
+    }
+  }
+  LOG(LS_WARNING) << "Failed to estimate RTP clock frequency: Estimate "
+                  << estimated_frequency
+                  << "not close to any stardard RTP frequency.";
+  return rtc::Optional<uint32_t>();
+}
+
 void EventLogAnalyzer::CreatePacketGraph(PacketDirection desired_direction,
                                          Plot* plot) {
   for (auto& kv : rtp_packets_) {
@@ -898,11 +946,11 @@ void EventLogAnalyzer::CreateFractionLossGraph(Plot* plot) {
     time_series.points.emplace_back(x, y);
   }
 
+  plot->AppendTimeSeries(std::move(time_series));
   plot->SetXAxis(0, call_duration_s_, "Time (s)", kLeftMargin, kRightMargin);
   plot->SetSuggestedYAxis(0, 10, "Percent lost packets", kBottomMargin,
                           kTopMargin);
   plot->SetTitle("Reported packet loss");
-  plot->AppendTimeSeries(std::move(time_series));
 }
 
 // Plot the total bandwidth used by all RTP streams.
@@ -1138,6 +1186,8 @@ void EventLogAnalyzer::CreateSendSideBweSimulationGraph(Plot* plot) {
 
   TimeSeries time_series("Delay-based estimate", LINE_DOT_GRAPH);
   TimeSeries acked_time_series("Acked bitrate", LINE_DOT_GRAPH);
+  TimeSeries acked_estimate_time_series("Acked bitrate estimate",
+                                        LINE_DOT_GRAPH);
 
   auto rtp_iterator = outgoing_rtp.begin();
   auto rtcp_iterator = incoming_rtcp.begin();
@@ -1164,7 +1214,17 @@ void EventLogAnalyzer::CreateSendSideBweSimulationGraph(Plot* plot) {
   };
 
   RateStatistics acked_bitrate(250, 8000);
-
+#if !(BWE_TEST_LOGGING_COMPILE_TIME_ENABLE)
+  // The event_log_visualizer should normally not be compiled with
+  // BWE_TEST_LOGGING_COMPILE_TIME_ENABLE since the normal plots won't work.
+  // However, compiling with BWE_TEST_LOGGING, runnning with --plot_sendside_bwe
+  // and piping the output to plot_dynamics.py can be used as a hack to get the
+  // internal state of various BWE components. In this case, it is important
+  // we don't instantiate the AcknowledgedBitrateEstimator both here and in
+  // SendSideCongestionController since that would lead to duplicate outputs.
+  AcknowledgedBitrateEstimator acknowledged_bitrate_estimator(
+      rtc::MakeUnique<BitrateEstimator>());
+#endif  // !(BWE_TEST_LOGGING_COMPILE_TIME_ENABLE)
   int64_t time_us = std::min(NextRtpTime(), NextRtcpTime());
   int64_t last_update_us = 0;
   while (time_us != std::numeric_limits<int64_t>::max()) {
@@ -1179,16 +1239,21 @@ void EventLogAnalyzer::CreateSendSideBweSimulationGraph(Plot* plot) {
         SortPacketFeedbackVector(&feedback);
         rtc::Optional<uint32_t> bitrate_bps;
         if (!feedback.empty()) {
+#if !(BWE_TEST_LOGGING_COMPILE_TIME_ENABLE)
+          acknowledged_bitrate_estimator.IncomingPacketFeedbackVector(feedback);
+#endif  // !(BWE_TEST_LOGGING_COMPILE_TIME_ENABLE)
           for (const PacketFeedback& packet : feedback)
             acked_bitrate.Update(packet.payload_size, packet.arrival_time_ms);
           bitrate_bps = acked_bitrate.Rate(feedback.back().arrival_time_ms);
         }
-        uint32_t y = 0;
-        if (bitrate_bps)
-          y = *bitrate_bps / 1000;
         float x = static_cast<float>(clock.TimeInMicroseconds() - begin_time_) /
                   1000000;
+        float y = bitrate_bps.value_or(0) / 1000;
         acked_time_series.points.emplace_back(x, y);
+#if !(BWE_TEST_LOGGING_COMPILE_TIME_ENABLE)
+        y = acknowledged_bitrate_estimator.bitrate_bps().value_or(0) / 1000;
+        acked_estimate_time_series.points.emplace_back(x, y);
+#endif  // !(BWE_TEST_LOGGING_COMPILE_TIME_ENABLE)
       }
       ++rtcp_iterator;
     }
@@ -1223,6 +1288,7 @@ void EventLogAnalyzer::CreateSendSideBweSimulationGraph(Plot* plot) {
   // Add the data set to the plot.
   plot->AppendTimeSeries(std::move(time_series));
   plot->AppendTimeSeries(std::move(acked_time_series));
+  plot->AppendTimeSeriesIfNotEmpty(std::move(acked_estimate_time_series));
 
   plot->SetXAxis(0, call_duration_s_, "Time (s)", kLeftMargin, kRightMargin);
   plot->SetSuggestedYAxis(0, 10, "Bitrate (kbps)", kBottomMargin, kTopMargin);
@@ -1433,6 +1499,55 @@ std::vector<std::pair<int64_t, int64_t>> EventLogAnalyzer::GetFrameTimestamps()
     }
   }
   return timestamps;
+}
+
+void EventLogAnalyzer::CreatePacerDelayGraph(Plot* plot) {
+  for (const auto& kv : rtp_packets_) {
+    const std::vector<LoggedRtpPacket>& packets = kv.second;
+    StreamId stream_id = kv.first;
+
+    if (packets.size() < 2) {
+      LOG(LS_WARNING) << "Can't estimate a the RTP clock frequency or the "
+                         "pacer delay with less than 2 packets in the stream";
+      continue;
+    }
+    rtc::Optional<uint32_t> estimated_frequency =
+        EstimateRtpClockFrequency(packets);
+    if (!estimated_frequency)
+      continue;
+    if (IsVideoSsrc(stream_id) && *estimated_frequency != 90000) {
+      LOG(LS_WARNING)
+          << "Video stream should use a 90 kHz clock but appears to use "
+          << *estimated_frequency / 1000 << ". Discarding.";
+      continue;
+    }
+
+    TimeSeries pacer_delay_series(
+        GetStreamName(stream_id) + "(" +
+            std::to_string(*estimated_frequency / 1000) + " kHz)",
+        LINE_DOT_GRAPH);
+    SeqNumUnwrapper<uint32_t> timestamp_unwrapper;
+    uint64_t first_capture_timestamp =
+        timestamp_unwrapper.Unwrap(packets.front().header.timestamp);
+    uint64_t first_send_timestamp = packets.front().timestamp;
+    for (LoggedRtpPacket packet : packets) {
+      double capture_time_ms = (static_cast<double>(timestamp_unwrapper.Unwrap(
+                                    packet.header.timestamp)) -
+                                first_capture_timestamp) /
+                               *estimated_frequency * 1000;
+      double send_time_ms =
+          static_cast<double>(packet.timestamp - first_send_timestamp) / 1000;
+      float x = static_cast<float>(packet.timestamp - begin_time_) / 1000000;
+      float y = send_time_ms - capture_time_ms;
+      pacer_delay_series.points.emplace_back(x, y);
+    }
+    plot->AppendTimeSeries(std::move(pacer_delay_series));
+  }
+
+  plot->SetXAxis(0, call_duration_s_, "Time (s)", kLeftMargin, kRightMargin);
+  plot->SetSuggestedYAxis(0, 10, "Pacer delay (ms)", kBottomMargin, kTopMargin);
+  plot->SetTitle(
+      "Delay from capture to send time. (First packet normalized to 0.)");
 }
 
 void EventLogAnalyzer::CreateTimestampGraph(Plot* plot) {

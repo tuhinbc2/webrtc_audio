@@ -128,16 +128,20 @@ public class WebRtcAudioRecord {
         }
       }
 
-      try {
-        if (audioRecord != null) {
+      // Stops recording audio data.
+      if (audioRecord != null) {
+        Logging.d(TAG, "Calling AudioRecord.stop...");
+        try {
           audioRecord.stop();
+          Logging.d(TAG, "AudioRecord.stop is done.");
+        } catch (IllegalStateException e) {
+          Logging.e(TAG, "AudioRecord.stop failed: " + e.getMessage());
         }
-      } catch (IllegalStateException e) {
-        Logging.e(TAG, "AudioRecord.stop failed: " + e.getMessage());
       }
+
     }
 
-    // Stops the inner thread loop and also calls AudioRecord.stop().
+    // Stops the inner thread loop which results in calling AudioRecord.stop().
     // Does not block the calling thread.
     public void stopThread() {
       Logging.d(TAG, "stopThread");
@@ -255,21 +259,15 @@ public class WebRtcAudioRecord {
     } catch (IllegalStateException e) {
       reportWebRtcAudioRecordStartError(AudioRecordStartErrorCode.AUDIO_RECORD_START_EXCEPTION,
           "AudioRecord.startRecording failed: " + e.getMessage());
+      releaseAudioResources();
       return false;
-    }
-
-    // Verify the recording state up to two times (with a sleep in between)
-    // before returning false and reporting an error.
-    int numberOfStateChecks = 0;
-    while (audioRecord.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING &&
-           ++numberOfStateChecks < 2) {
-      threadSleep(200);
     }
     if (audioRecord.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) {
       reportWebRtcAudioRecordStartError(
           AudioRecordStartErrorCode.AUDIO_RECORD_START_STATE_MISMATCH,
           "AudioRecord.startRecording failed - incorrect state :"
           + audioRecord.getRecordingState());
+      releaseAudioResources();
       return false;
     }
 
@@ -286,9 +284,13 @@ public class WebRtcAudioRecord {
     Logging.d(TAG, "stopRecording");
     assertTrue(audioThread != null);
     audioThread.stopThread();
+
+    Logging.d(TAG, "Stopping the AudioRecordThread...");
+    audioThread.interrupt();
     if (!ThreadUtils.joinUninterruptibly(audioThread, AUDIO_RECORD_THREAD_JOIN_TIMEOUT_MS)) {
-      Logging.e(TAG, "Join of AudioRecordJavaThread timed out");
+      Logging.e(TAG, "Join of AudioRecordThread timed out.");
     }
+    Logging.d(TAG, "AudioRecordThread has now been stopped.");
     audioThread = null;
     if (effects != null) {
       effects.release();
@@ -353,6 +355,7 @@ public class WebRtcAudioRecord {
 
   // Releases the native AudioRecord resources.
   private void releaseAudioResources() {
+    Logging.d(TAG, "releaseAudioResources");
     if (audioRecord != null) {
       audioRecord.release();
       audioRecord = null;
@@ -378,16 +381,6 @@ public class WebRtcAudioRecord {
     Logging.e(TAG, "Run-time recording error: " + errorMessage);
     if (errorCallback != null) {
       errorCallback.onWebRtcAudioRecordError(errorMessage);
-    }
-  }
-
-  // Causes the currently executing thread to sleep for the specified number
-  // of milliseconds.
-  private void threadSleep(long millis) {
-    try {
-      Thread.sleep(millis);
-    } catch (InterruptedException e) {
-      Logging.e(TAG, "Thread.sleep failed: " + e.getMessage());
     }
   }
 }

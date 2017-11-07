@@ -50,8 +50,9 @@ typedef TypeForAdd<float> FloatForAdd;
 typedef TypeForAdd<int64_t> Int64ForAdd;
 typedef TypeForAdd<int> IntForAdd;
 
-StatsReport::Id GetTransportIdFromProxy(const ProxyTransportMap& map,
-                                        const std::string& proxy) {
+StatsReport::Id GetTransportIdFromProxy(
+    const std::map<std::string, std::string>& map,
+    const std::string& proxy) {
   RTC_DCHECK(!proxy.empty());
   auto found = map.find(proxy);
   if (found == map.end()) {
@@ -73,13 +74,14 @@ StatsReport* AddTrackReport(StatsCollection* reports,
 }
 
 template <class TrackVector>
-void CreateTrackReports(const TrackVector& tracks, StatsCollection* reports,
-                        TrackIdMap& track_ids) {
+void CreateTrackReports(const TrackVector& tracks,
+                        StatsCollection* reports,
+                        TrackIdMap* track_ids) {
   for (const auto& track : tracks) {
     const std::string& track_id = track->id();
     StatsReport* report = AddTrackReport(reports, track_id);
     RTC_DCHECK(report != nullptr);
-    track_ids[track_id] = report;
+    (*track_ids)[track_id] = report;
   }
 }
 
@@ -462,10 +464,10 @@ void StatsCollector::AddStream(MediaStreamInterface* stream) {
   RTC_DCHECK(pc_->signaling_thread()->IsCurrent());
   RTC_DCHECK(stream != NULL);
 
-  CreateTrackReports<AudioTrackVector>(stream->GetAudioTracks(),
-                                       &reports_, track_ids_);
-  CreateTrackReports<VideoTrackVector>(stream->GetVideoTracks(),
-                                       &reports_, track_ids_);
+  CreateTrackReports<AudioTrackVector>(stream->GetAudioTracks(), &reports_,
+                                       &track_ids_);
+  CreateTrackReports<VideoTrackVector>(stream->GetVideoTracks(), &reports_,
+                                       &track_ids_);
 }
 
 void StatsCollector::AddLocalAudioTrack(AudioTrackInterface* audio_track,
@@ -555,23 +557,19 @@ StatsCollector::UpdateStats(PeerConnectionInterface::StatsOutputLevel level) {
   }
   stats_gathering_started_ = time_now;
 
-  // TODO(pthatcher): Merge PeerConnection and WebRtcSession so there is no
-  // pc_->session().
-  if (pc_->session_created()) {
-    // TODO(tommi): All of these hop over to the worker thread to fetch
-    // information.  We could use an AsyncInvoker to run all of these and post
-    // the information back to the signaling thread where we can create and
-    // update stats reports.  That would also clean up the threading story a bit
-    // since we'd be creating/updating the stats report objects consistently on
-    // the same thread (this class has no locks right now).
-    ExtractSessionInfo();
-    ExtractBweInfo();
-    ExtractVoiceInfo();
-    ExtractVideoInfo(level);
-    ExtractSenderInfo();
-    ExtractDataInfo();
-    UpdateTrackReports();
-  }
+  // TODO(tommi): All of these hop over to the worker thread to fetch
+  // information.  We could use an AsyncInvoker to run all of these and post
+  // the information back to the signaling thread where we can create and
+  // update stats reports.  That would also clean up the threading story a bit
+  // since we'd be creating/updating the stats report objects consistently on
+  // the same thread (this class has no locks right now).
+  ExtractSessionInfo();
+  ExtractBweInfo();
+  ExtractVoiceInfo();
+  ExtractVideoInfo(level);
+  ExtractSenderInfo();
+  ExtractDataInfo();
+  UpdateTrackReports();
 }
 
 StatsReport* StatsCollector::PrepareReport(

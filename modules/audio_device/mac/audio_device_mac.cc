@@ -1553,13 +1553,6 @@ int32_t AudioDeviceMac::PlayoutDelay(uint16_t& delayMS) const {
   return 0;
 }
 
-int32_t AudioDeviceMac::RecordingDelay(uint16_t& delayMS) const {
-  int32_t captureDelayUs = AtomicGet32(&_captureDelayUs);
-  delayMS =
-      static_cast<uint16_t>(1e-3 * (captureDelayUs + _captureLatencyUs) + 0.5);
-  return 0;
-}
-
 bool AudioDeviceMac::Playing() const {
   return (_playing);
 }
@@ -2035,6 +2028,12 @@ int32_t AudioDeviceMac::HandleStreamFormatChange(
     return -1;
   }
 
+  if (_ptrAudioBuffer && streamFormat.mChannelsPerFrame != _recChannels) {
+    LOG(LS_ERROR) << "Changing channels not supported (mChannelsPerFrame = "
+                  << streamFormat.mChannelsPerFrame << ")";
+    return -1;
+  }
+
   LOG(LS_VERBOSE) << "Stream format:";
   LOG(LS_VERBOSE) << "mSampleRate = " << streamFormat.mSampleRate
                   << ", mChannelsPerFrame = " << streamFormat.mChannelsPerFrame;
@@ -2066,12 +2065,6 @@ int32_t AudioDeviceMac::HandleStreamFormatChange(
       _inDesiredFormat.mChannelsPerFrame = 1;
       _recChannels = 1;
       LOG(LS_VERBOSE) << "Stereo recording unavailable on this device";
-    }
-
-    if (_ptrAudioBuffer) {
-      // Update audio buffer with the selected parameters
-      _ptrAudioBuffer->SetRecordingSampleRate(N_REC_SAMPLES_PER_SEC);
-      _ptrAudioBuffer->SetRecordingChannels((uint8_t)_recChannels);
     }
 
     // Recreate the converter with the new format

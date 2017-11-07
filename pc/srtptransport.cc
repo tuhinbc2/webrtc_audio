@@ -11,6 +11,7 @@
 #include "pc/srtptransport.h"
 
 #include <string>
+#include <vector>
 
 #include "media/base/rtputils.h"
 #include "pc/rtptransport.h"
@@ -204,7 +205,7 @@ bool SrtpTransport::SetRtpParams(int send_cs,
     return false;
   }
 
-  LOG(LS_INFO) << "SRTP " << (new_sessions ? "updated" : "activated")
+  LOG(LS_INFO) << "SRTP " << (new_sessions ? "activated" : "updated")
                << " with negotiated parameters:"
                << " send cipher_suite " << send_cs << " recv cipher_suite "
                << recv_cs;
@@ -225,7 +226,7 @@ bool SrtpTransport::SetRtcpParams(int send_cs,
   }
 
   send_rtcp_session_.reset(new cricket::SrtpSession());
-  if (!send_rtcp_session_->SetRecv(send_cs, send_key, send_key_len)) {
+  if (!send_rtcp_session_->SetSend(send_cs, send_key, send_key_len)) {
     return false;
   }
 

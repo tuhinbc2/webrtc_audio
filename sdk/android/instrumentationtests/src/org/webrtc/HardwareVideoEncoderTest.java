@@ -78,11 +78,12 @@ public class HardwareVideoEncoderTest {
   // # Mock classes
   /**
    * Mock encoder callback that allows easy verification of the general properties of the encoded
-   * frame such as width and height.
+   * frame such as width and height. Also used from HardwareVideoDecoderTest.
    */
-  private static class MockEncoderCallback implements VideoEncoder.Callback {
+  static class MockEncoderCallback implements VideoEncoder.Callback {
     private BlockingQueue<EncodedImage> frameQueue = new LinkedBlockingQueue<>();
 
+    @Override
     public void onEncodedFrame(EncodedImage frame, VideoEncoder.CodecSpecificInfo info) {
       assertNotNull(frame);
       assertNotNull(info);
@@ -243,10 +244,11 @@ public class HardwareVideoEncoderTest {
   }
 
   // # Test fields
-  private Object referencedFramesLock = new Object();
+  private final Object referencedFramesLock = new Object();
   private int referencedFrames = 0;
 
   private Runnable releaseFrameCallback = new Runnable() {
+    @Override
     public void run() {
       synchronized (referencedFramesLock) {
         --referencedFrames;
@@ -294,7 +296,7 @@ public class HardwareVideoEncoderTest {
     return useTextures ? generateTextureFrame(width, height) : generateI420Frame(width, height);
   }
 
-  private void testEncodeFrame(
+  static void testEncodeFrame(
       VideoEncoder encoder, VideoFrame frame, VideoEncoder.EncodeInfo info) {
     int numTries = 0;
 
@@ -326,6 +328,8 @@ public class HardwareVideoEncoderTest {
   // # Tests
   @Before
   public void setUp() {
+    NativeLibrary.initialize(new NativeLibrary.DefaultLoader());
+
     eglBase = new EglBase14(null, EglBase.CONFIG_PLAIN);
     eglBase.createDummyPbufferSurface();
     eglBase.makeCurrent();

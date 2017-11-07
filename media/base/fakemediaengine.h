@@ -16,6 +16,8 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include "api/call/audio_sink.h"
@@ -488,12 +490,11 @@ class FakeVoiceMediaChannel : public RtpHelper<VoiceMediaChannel> {
       if (it != local_sinks_.end()) {
         RTC_CHECK(it->second->source() == source);
       } else {
-        local_sinks_.insert(
-            std::make_pair(ssrc, new VoiceChannelAudioSink(source)));
+        local_sinks_.insert(std::make_pair(
+            ssrc, rtc::MakeUnique<VoiceChannelAudioSink>(source)));
       }
     } else {
       if (it != local_sinks_.end()) {
-        delete it->second;
         local_sinks_.erase(it);
       }
     }
@@ -506,7 +507,7 @@ class FakeVoiceMediaChannel : public RtpHelper<VoiceMediaChannel> {
   std::map<uint32_t, double> output_scalings_;
   std::vector<DtmfInfo> dtmf_info_queue_;
   AudioOptions options_;
-  std::map<uint32_t, VoiceChannelAudioSink*> local_sinks_;
+  std::map<uint32_t, std::unique_ptr<VoiceChannelAudioSink>> local_sinks_;
   std::unique_ptr<webrtc::AudioSinkInterface> sink_;
   int max_bps_;
 };
@@ -949,8 +950,6 @@ inline FakeVideoMediaChannel::~FakeVideoMediaChannel() {
 
 class FakeDataEngine : public DataEngineInterface {
  public:
-  FakeDataEngine(){};
-
   virtual DataMediaChannel* CreateChannel(const MediaConfig& config) {
     FakeDataMediaChannel* ch = new FakeDataMediaChannel(this, DataOptions());
     channels_.push_back(ch);

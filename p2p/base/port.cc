@@ -10,6 +10,8 @@
 
 #include "p2p/base/port.h"
 
+#include <math.h>
+
 #include <algorithm>
 #include <vector>
 
@@ -170,6 +172,15 @@ Port::Port(rtc::Thread* thread,
            const std::string& type,
            rtc::PacketSocketFactory* factory,
            rtc::Network* network,
+           const rtc::IPAddress& ip,
+           const std::string& username_fragment,
+           const std::string& password)
+    : Port(thread, type, factory, network, username_fragment, password) {}
+
+Port::Port(rtc::Thread* thread,
+           const std::string& type,
+           rtc::PacketSocketFactory* factory,
+           rtc::Network* network,
            uint16_t min_port,
            uint16_t max_port,
            const std::string& username_fragment,
@@ -227,6 +238,32 @@ Port::~Port() {
     delete list[i];
 }
 
+const std::string& Port::Type() const {
+  return type_;
+}
+rtc::Network* Port::Network() const {
+  return network_;
+}
+
+IceRole Port::GetIceRole() const {
+  return ice_role_;
+}
+
+void Port::SetIceRole(IceRole role) {
+  ice_role_ = role;
+}
+
+void Port::SetIceTiebreaker(uint64_t tiebreaker) {
+  tiebreaker_ = tiebreaker;
+}
+uint64_t Port::IceTiebreaker() const {
+  return tiebreaker_;
+}
+
+bool Port::SharedSocket() const {
+  return shared_socket_;
+}
+
 void Port::SetIceParameters(int component,
                             const std::string& username_fragment,
                             const std::string& password) {
@@ -238,6 +275,10 @@ void Port::SetIceParameters(int component,
     c.set_username(username_fragment);
     c.set_password(password);
   }
+}
+
+const std::vector<Candidate>& Port::Candidates() const {
+  return candidates_;
 }
 
 Connection* Port::GetConnection(const rtc::SocketAddress& remote_addr) {
@@ -575,6 +616,15 @@ void Port::CreateStunUsername(const std::string& remote_username,
   stun_username_attr_str->append(username_fragment());
 }
 
+bool Port::HandleIncomingPacket(rtc::AsyncPacketSocket* socket,
+                                const char* data,
+                                size_t size,
+                                const rtc::SocketAddress& remote_addr,
+                                const rtc::PacketTime& packet_time) {
+  RTC_NOTREACHED();
+  return false;
+}
+
 void Port::SendBindingResponse(StunMessage* request,
                                const rtc::SocketAddress& addr) {
   RTC_DCHECK(request->type() == STUN_BINDING_REQUEST);
@@ -771,9 +821,6 @@ class ConnectionRequest : public StunRequest {
   explicit ConnectionRequest(Connection* connection)
       : StunRequest(new IceMessage()),
         connection_(connection) {
-  }
-
-  virtual ~ConnectionRequest() {
   }
 
   void Prepare(StunMessage* request) override {
@@ -1634,6 +1681,10 @@ int ProxyConnection::Send(const void* data, size_t size,
     send_rate_tracker_.AddSamples(sent);
   }
   return sent;
+}
+
+int ProxyConnection::GetError() {
+  return error_;
 }
 
 }  // namespace cricket

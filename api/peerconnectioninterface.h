@@ -79,6 +79,7 @@
 #include "api/jsep.h"
 #include "api/mediastreaminterface.h"
 #include "api/rtcerror.h"
+#include "api/rtceventlogoutput.h"
 #include "api/rtpreceiverinterface.h"
 #include "api/rtpsenderinterface.h"
 #include "api/stats/rtcstatscollectorcallback.h"
@@ -435,11 +436,6 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
 
     struct cricket::MediaConfig media_config;
 
-    // This doesn't currently work. For a while we were working on adding QUIC
-    // data channel support to PeerConnection, but decided on a different
-    // approach, and that code hasn't been updated for a while.
-    bool enable_quic = false;
-
     // If set to true, only one preferred TURN allocation will be used per
     // network interface. UDP is preferred over TCP and IPv6 over IPv4. This
     // can be used to cut down on the number of candidate pairings.
@@ -467,7 +463,6 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
     // If set, the min interval (max rate) at which we will send ICE checks
     // (STUN pings), in milliseconds.
     rtc::Optional<int> ice_check_min_interval;
-
 
     // ICE Periodic Regathering
     // If set, WebRTC will periodically create and propose candidates without
@@ -785,9 +780,38 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   // to the provided value.
   virtual RTCError SetBitrate(const BitrateParameters& bitrate) = 0;
 
+  // Sets current strategy. If not set default WebRTC allocator will be used.
+  // May be changed during an active session. The strategy
+  // ownership is passed with std::unique_ptr
+  // TODO(alexnarest): Make this pure virtual when tests will be updated
+  virtual void SetBitrateAllocationStrategy(
+      std::unique_ptr<rtc::BitrateAllocationStrategy>
+          bitrate_allocation_strategy) {}
+
+  // Enable/disable playout of received audio streams. Enabled by default. Note
+  // that even if playout is enabled, streams will only be played out if the
+  // appropriate SDP is also applied. Setting |playout| to false will stop
+  // playout of the underlying audio device but starts a task which will poll
+  // for audio data every 10ms to ensure that audio processing happens and the
+  // audio statistics are updated.
+  // TODO(henrika): deprecate and remove this.
+  virtual void SetAudioPlayout(bool playout) {}
+
+  // Enable/disable recording of transmitted audio streams. Enabled by default.
+  // Note that even if recording is enabled, streams will only be recorded if
+  // the appropriate SDP is also applied.
+  // TODO(henrika): deprecate and remove this.
+  virtual void SetAudioRecording(bool recording) {}
+
   // Returns the current SignalingState.
   virtual SignalingState signaling_state() = 0;
+
+  // Returns the aggregate state of all ICE *and* DTLS transports.
+  // TODO(deadbeef): Implement "PeerConnectionState" according to the standard,
+  // to aggregate ICE+DTLS state, and change the scope of IceConnectionState to
+  // be just the ICE layer. See: crbug.com/webrtc/6145
   virtual IceConnectionState ice_connection_state() = 0;
+
   virtual IceGatheringState ice_gathering_state() = 0;
 
   // Starts RtcEventLog using existing file. Takes ownership of |file| and
@@ -795,9 +819,16 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   // operation fails the file will be closed. The logging will stop
   // automatically after 10 minutes have passed, or when the StopRtcEventLog
   // function is called.
-  // TODO(ivoc): Make this pure virtual when Chrome is updated.
+  // TODO(eladalon): Deprecate and remove this.
   virtual bool StartRtcEventLog(rtc::PlatformFile file,
                                 int64_t max_size_bytes) {
+    return false;
+  }
+
+  // Start RtcEventLog using an existing output-sink. Takes ownership of
+  // |output| and passes it on to Call, which will take the ownership. If the
+  // operation fails the output will be closed and deallocated.
+  virtual bool StartRtcEventLog(std::unique_ptr<RtcEventLogOutput> output) {
     return false;
   }
 
@@ -1074,11 +1105,6 @@ rtc::scoped_refptr<PeerConnectionFactoryInterface> CreatePeerConnectionFactory(
     rtc::scoped_refptr<AudioEncoderFactory> audio_encoder_factory,
     rtc::scoped_refptr<AudioDecoderFactory> audio_decoder_factory);
 
-// Deprecated variant of the above.
-// TODO(kwiberg): Remove.
-rtc::scoped_refptr<PeerConnectionFactoryInterface>
-CreatePeerConnectionFactory();
-
 // Create a new instance of PeerConnectionFactoryInterface.
 //
 // |network_thread|, |worker_thread| and |signaling_thread| are
@@ -1098,16 +1124,6 @@ rtc::scoped_refptr<PeerConnectionFactoryInterface> CreatePeerConnectionFactory(
     rtc::scoped_refptr<AudioDecoderFactory> audio_decoder_factory,
     cricket::WebRtcVideoEncoderFactory* video_encoder_factory,
     cricket::WebRtcVideoDecoderFactory* video_decoder_factory);
-
-// Deprecated variant of the above.
-// TODO(kwiberg): Remove.
-rtc::scoped_refptr<PeerConnectionFactoryInterface> CreatePeerConnectionFactory(
-    rtc::Thread* network_thread,
-    rtc::Thread* worker_thread,
-    rtc::Thread* signaling_thread,
-    AudioDeviceModule* default_adm,
-    cricket::WebRtcVideoEncoderFactory* encoder_factory,
-    cricket::WebRtcVideoDecoderFactory* decoder_factory);
 
 // Create a new instance of PeerConnectionFactoryInterface with optional
 // external audio mixed and audio processing modules.
@@ -1158,18 +1174,6 @@ CreatePeerConnectionFactoryWithAudioMixer(
     cricket::WebRtcVideoDecoderFactory* video_decoder_factory,
     rtc::scoped_refptr<AudioMixer> audio_mixer);
 
-// Deprecated variant of the above.
-// TODO(kwiberg): Remove.
-rtc::scoped_refptr<PeerConnectionFactoryInterface>
-CreatePeerConnectionFactoryWithAudioMixer(
-    rtc::Thread* network_thread,
-    rtc::Thread* worker_thread,
-    rtc::Thread* signaling_thread,
-    AudioDeviceModule* default_adm,
-    cricket::WebRtcVideoEncoderFactory* encoder_factory,
-    cricket::WebRtcVideoDecoderFactory* decoder_factory,
-    rtc::scoped_refptr<AudioMixer> audio_mixer);
-
 // Create a new instance of PeerConnectionFactoryInterface.
 // Same thread is used as worker and network thread.
 inline rtc::scoped_refptr<PeerConnectionFactoryInterface>
@@ -1185,20 +1189,6 @@ CreatePeerConnectionFactory(
       worker_and_network_thread, worker_and_network_thread, signaling_thread,
       default_adm, audio_encoder_factory, audio_decoder_factory,
       video_encoder_factory, video_decoder_factory);
-}
-
-// Deprecated variant of the above.
-// TODO(kwiberg): Remove.
-inline rtc::scoped_refptr<PeerConnectionFactoryInterface>
-CreatePeerConnectionFactory(
-    rtc::Thread* worker_and_network_thread,
-    rtc::Thread* signaling_thread,
-    AudioDeviceModule* default_adm,
-    cricket::WebRtcVideoEncoderFactory* encoder_factory,
-    cricket::WebRtcVideoDecoderFactory* decoder_factory) {
-  return CreatePeerConnectionFactory(
-      worker_and_network_thread, worker_and_network_thread, signaling_thread,
-      default_adm, encoder_factory, decoder_factory);
 }
 
 // This is a lower-level version of the CreatePeerConnectionFactory functions

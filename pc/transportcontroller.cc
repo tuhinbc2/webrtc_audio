@@ -248,9 +248,6 @@ DtlsTransportInternal* TransportController::CreateDtlsTransport_n(
   // Create DTLS channel wrapping ICE channel, and configure it.
   IceTransportInternal* ice =
       CreateIceTransportChannel_n(transport_name, component);
-  // TODO(deadbeef): To support QUIC, would need to create a
-  // QuicTransportChannel here. What is "dtls" in this file would then become
-  // "dtls or quic".
   DtlsTransportInternal* dtls =
       CreateDtlsTransportChannel_n(transport_name, component, ice);
   dtls->ice_transport()->SetMetricsObserver(metrics_observer_);
@@ -310,7 +307,10 @@ void TransportController::DestroyDtlsTransport_n(
                     << ", which doesn't exist.";
     return;
   }
-  if ((*it)->Release() > 0) {
+  // Release one reference to the RefCountedChannel, and do additional cleanup
+  // only if it was the last one. Matches the AddRef logic in
+  // CreateDtlsTransport_n.
+  if ((*it)->Release() == rtc::RefCountReleaseStatus::kOtherRefsRemained) {
     return;
   }
   channels_.erase(it);
@@ -471,11 +471,14 @@ JsepTransport* TransportController::GetOrCreateJsepTransport(
 void TransportController::DestroyAllChannels_n() {
   RTC_DCHECK(network_thread_->IsCurrent());
   transports_.clear();
+  // TODO(nisse): If |channels_| were a vector of scoped_refptr, we
+  // wouldn't need this strange hack.
   for (RefCountedChannel* channel : channels_) {
     // Even though these objects are normally ref-counted, if
     // TransportController is deleted while they still have references, just
     // remove all references.
-    while (channel->Release() > 0) {
+    while (channel->Release() ==
+           rtc::RefCountReleaseStatus::kOtherRefsRemained) {
     }
   }
   channels_.clear();
@@ -694,8 +697,13 @@ bool TransportController::RemoveRemoteCandidates_n(const Candidates& candidates,
 
   std::map<std::string, Candidates> candidates_by_transport_name;
   for (const Candidate& cand : candidates) {
-    RTC_DCHECK(!cand.transport_name().empty());
-    candidates_by_transport_name[cand.transport_name()].push_back(cand);
+    if (!cand.transport_name().empty()) {
+      candidates_by_transport_name[cand.transport_name()].push_back(cand);
+    } else {
+      LOG(LS_ERROR) << "Not removing candidate because it does not have a "
+                       "transport name set: "
+                    << cand.ToString();
+    }
   }
 
   bool result = true;

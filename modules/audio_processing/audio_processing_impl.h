@@ -43,6 +43,7 @@ class AudioProcessingImpl : public AudioProcessing {
   // beamformer.
   AudioProcessingImpl(const webrtc::Config& config,
                       std::unique_ptr<PostProcessing> capture_post_processor,
+                      std::unique_ptr<EchoControlFactory> echo_control_factory,
                       NonlinearBeamformer* beamformer);
   ~AudioProcessingImpl() override;
   int Initialize() override;
@@ -141,6 +142,9 @@ class AudioProcessingImpl : public AudioProcessing {
   // Submodule interface implementations.
   std::unique_ptr<HighPassFilter> high_pass_filter_impl_;
 
+  // EchoControl factory.
+  std::unique_ptr<EchoControlFactory> echo_control_factory_;
+
   class ApmSubmoduleStates {
    public:
     explicit ApmSubmoduleStates(bool capture_post_processor_enabled);
@@ -155,7 +159,7 @@ class AudioProcessingImpl : public AudioProcessing {
                 bool adaptive_gain_controller_enabled,
                 bool gain_controller2_enabled,
                 bool level_controller_enabled,
-                bool echo_canceller3_enabled,
+                bool echo_controller_enabled,
                 bool voice_activity_detector_enabled,
                 bool level_estimator_enabled,
                 bool transient_suppressor_enabled);
@@ -177,7 +181,7 @@ class AudioProcessingImpl : public AudioProcessing {
     bool adaptive_gain_controller_enabled_ = false;
     bool gain_controller2_enabled_ = false;
     bool level_controller_enabled_ = false;
-    bool echo_canceller3_enabled_ = false;
+    bool echo_controller_enabled_ = false;
     bool level_estimator_enabled_ = false;
     bool voice_activity_detector_enabled_ = false;
     bool transient_suppressor_enabled_ = false;
@@ -220,7 +224,7 @@ class AudioProcessingImpl : public AudioProcessing {
   void InitializeResidualEchoDetector()
       RTC_EXCLUSIVE_LOCKS_REQUIRED(crit_render_, crit_capture_);
   void InitializeLowCutFilter() RTC_EXCLUSIVE_LOCKS_REQUIRED(crit_capture_);
-  void InitializeEchoCanceller3() RTC_EXCLUSIVE_LOCKS_REQUIRED(crit_capture_);
+  void InitializeEchoController() RTC_EXCLUSIVE_LOCKS_REQUIRED(crit_capture_);
   void InitializeGainController2() RTC_EXCLUSIVE_LOCKS_REQUIRED(crit_capture_);
   void InitializePostProcessor() RTC_EXCLUSIVE_LOCKS_REQUIRED(crit_capture_);
 
@@ -369,8 +373,7 @@ class AudioProcessingImpl : public AudioProcessing {
     bool beamformer_enabled;
     bool intelligibility_enabled;
     bool level_controller_enabled = false;
-    bool echo_canceller3_enabled = false;
-    bool gain_controller2_enabled = false;
+    bool echo_controller_enabled = false;
   } capture_nonlocked_;
 
   struct ApmRenderState {

@@ -19,6 +19,8 @@ namespace webrtc {
 
 class AudioDeviceModule : public rtc::RefCountInterface {
  public:
+  // Deprecated.
+  // TODO(henrika): to be removed.
   enum ErrorCode {
     kAdmErrNone = 0,
     kAdmErrArgument = 1
@@ -48,15 +50,13 @@ class AudioDeviceModule : public rtc::RefCountInterface {
 
  public:
   // Create an ADM.
+  // TODO(henrika): remove |id|.
   static rtc::scoped_refptr<AudioDeviceModule> Create(
       const int32_t id,
       const AudioLayer audio_layer);
 
   // Retrieve the currently utilized audio layer
   virtual int32_t ActiveAudioLayer(AudioLayer* audioLayer) const = 0;
-
-  // Error handling
-  virtual ErrorCode LastError() const = 0;
 
   // Full-duplex transportation of PCM audio
   virtual int32_t RegisterAudioCallback(AudioTransport* audioCallback) = 0;
@@ -142,9 +142,8 @@ class AudioDeviceModule : public rtc::RefCountInterface {
   virtual int32_t SetRecordingChannel(const ChannelType channel) = 0;
   virtual int32_t RecordingChannel(ChannelType* channel) const = 0;
 
-  // Delay information and control
+  // Playout delay
   virtual int32_t PlayoutDelay(uint16_t* delayMS) const = 0;
-  virtual int32_t RecordingDelay(uint16_t* delayMS) const = 0;
 
   // Native sample rate controls (samples/sec)
   virtual int32_t SetRecordingSampleRate(const uint32_t samplesPerSec) = 0;

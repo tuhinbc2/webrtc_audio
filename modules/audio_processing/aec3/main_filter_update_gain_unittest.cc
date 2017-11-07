@@ -53,7 +53,7 @@ void RunFilterUpdateTest(int num_blocks_to_process,
   Random random_generator(42U);
   std::vector<std::vector<float>> x(3, std::vector<float>(kBlockSize, 0.f));
   std::vector<float> y(kBlockSize, 0.f);
-  AecState aec_state(AudioProcessing::Config::EchoCanceller3{});
+  AecState aec_state(EchoCanceller3Config{});
   RenderSignalAnalyzer render_signal_analyzer;
   std::array<float, kFftLength> s_scratch;
   std::array<float, kBlockSize> s;
@@ -135,7 +135,7 @@ void RunFilterUpdateTest(int num_blocks_to_process,
     // Update the delay.
     aec_state.HandleEchoPathChange(EchoPathVariability(false, false));
     aec_state.Update(main_filter.FilterFrequencyResponse(),
-                     main_filter.FilterImpulseResponse(),
+                     main_filter.FilterImpulseResponse(), true,
                      rtc::Optional<size_t>(), render_buffer, E2_main, Y2, x[0],
                      s, false);
   }

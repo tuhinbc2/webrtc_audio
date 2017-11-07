@@ -49,9 +49,8 @@ void LinearEchoPower(const FftData& E,
 // Class for removing the echo from the capture signal.
 class EchoRemoverImpl final : public EchoRemover {
  public:
-  explicit EchoRemoverImpl(
-      const AudioProcessing::Config::EchoCanceller3& config,
-      int sample_rate_hz);
+  explicit EchoRemoverImpl(const EchoCanceller3Config& config,
+                           int sample_rate_hz);
   ~EchoRemoverImpl() override;
 
   // Removes the echo from a block of samples from the capture signal. The
@@ -71,7 +70,7 @@ class EchoRemoverImpl final : public EchoRemover {
 
  private:
   static int instance_count_;
-  const AudioProcessing::Config::EchoCanceller3 config_;
+  const EchoCanceller3Config config_;
   const Aec3Fft fft_;
   std::unique_ptr<ApmDataDumper> data_dumper_;
   const Aec3Optimization optimization_;
@@ -92,9 +91,8 @@ class EchoRemoverImpl final : public EchoRemover {
 
 int EchoRemoverImpl::instance_count_ = 0;
 
-EchoRemoverImpl::EchoRemoverImpl(
-    const AudioProcessing::Config::EchoCanceller3& config,
-    int sample_rate_hz)
+EchoRemoverImpl::EchoRemoverImpl(const EchoCanceller3Config& config,
+                                 int sample_rate_hz)
     : config_(config),
       fft_(),
       data_dumper_(
@@ -172,11 +170,12 @@ void EchoRemoverImpl::ProcessCapture(
   // Update the AEC state information.
   aec_state_.Update(subtractor_.FilterFrequencyResponse(),
                     subtractor_.FilterImpulseResponse(),
-                    echo_path_delay_samples, render_buffer, E2_main, Y2, x0,
-                    subtractor_output.s_main, echo_leakage_detected_);
+                    subtractor_.ConvergedFilter(), echo_path_delay_samples,
+                    render_buffer, E2_main, Y2, x0, subtractor_output.s_main,
+                    echo_leakage_detected_);
 
   // Choose the linear output.
-  output_selector_.FormLinearOutput(!aec_state_.HeadsetDetected(), e_main, y0);
+  output_selector_.FormLinearOutput(!aec_state_.TransparentMode(), e_main, y0);
   data_dumper_->DumpWav("aec3_output_linear", kBlockSize, &y0[0],
                         LowestBandRate(sample_rate_hz_), 1);
   data_dumper_->DumpRaw("aec3_output_linear", y0);
@@ -190,10 +189,9 @@ void EchoRemoverImpl::ProcessCapture(
   cng_.Compute(aec_state_, Y2, &comfort_noise, &high_band_comfort_noise);
 
   // A choose and apply echo suppression gain.
-  suppression_gain_.GetGain(
-      E2, R2, cng_.NoiseSpectrum(), render_signal_analyzer_,
-      aec_state_.SaturatedEcho(), x, aec_state_.ForcedZeroGain(),
-      aec_state_.LinearEchoEstimate(), &high_bands_gain, &G);
+  suppression_gain_.GetGain(E2, R2, cng_.NoiseSpectrum(),
+                            render_signal_analyzer_, aec_state_, x,
+                            &high_bands_gain, &G);
   suppression_filter_.ApplyGain(comfort_noise, high_band_comfort_noise, G,
                                 high_bands_gain, y);
 
@@ -241,9 +239,8 @@ void EchoRemoverImpl::ProcessCapture(
 
 }  // namespace
 
-EchoRemover* EchoRemover::Create(
-    const AudioProcessing::Config::EchoCanceller3& config,
-    int sample_rate_hz) {
+EchoRemover* EchoRemover::Create(const EchoCanceller3Config& config,
+                                 int sample_rate_hz) {
   return new EchoRemoverImpl(config, sample_rate_hz);
 }
 

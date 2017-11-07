@@ -11,6 +11,7 @@
 #ifndef API_PEERCONNECTIONPROXY_H_
 #define API_PEERCONNECTIONPROXY_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -99,12 +100,18 @@ BEGIN_SIGNALING_PROXY_MAP(PeerConnection)
   PROXY_METHOD1(bool,
                 RemoveIceCandidates,
                 const std::vector<cricket::Candidate>&);
+  PROXY_METHOD1(void, SetAudioPlayout, bool)
+  PROXY_METHOD1(void, SetAudioRecording, bool)
   PROXY_METHOD1(void, RegisterUMAObserver, UMAObserver*)
   PROXY_METHOD1(RTCError, SetBitrate, const BitrateParameters&);
+  PROXY_METHOD1(void,
+                SetBitrateAllocationStrategy,
+                std::unique_ptr<rtc::BitrateAllocationStrategy>);
   PROXY_METHOD0(SignalingState, signaling_state)
   PROXY_METHOD0(IceConnectionState, ice_connection_state)
   PROXY_METHOD0(IceGatheringState, ice_gathering_state)
   PROXY_METHOD2(bool, StartRtcEventLog, rtc::PlatformFile, int64_t)
+  PROXY_METHOD1(bool, StartRtcEventLog, std::unique_ptr<RtcEventLogOutput>)
   PROXY_METHOD0(void, StopRtcEventLog)
   PROXY_METHOD0(void, Close)
 END_PROXY_MAP()

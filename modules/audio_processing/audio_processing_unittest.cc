@@ -308,6 +308,19 @@ void ClearTempFiles() {
     remove(kv.second.c_str());
 }
 
+// Only remove "out" files. Keep "ref" files.
+void ClearTempOutFiles() {
+  for (auto it = temp_filenames.begin(); it != temp_filenames.end();) {
+    const std::string& filename = it->first;
+    if (filename.substr(0, 3).compare("out") == 0) {
+      remove(it->second.c_str());
+      temp_filenames.erase(it++);
+    } else {
+      it++;
+    }
+  }
+}
+
 void OpenFileAndReadMessage(const std::string& filename, MessageLite* msg) {
   FILE* file = fopen(filename.c_str(), "rb");
   ASSERT_TRUE(file != NULL);
@@ -1304,7 +1317,7 @@ TEST_F(ApmTest, AgcOnlyAdaptsWhenTargetSignalIsPresent) {
   testing::NiceMock<MockNonlinearBeamformer>* beamformer =
       new testing::NiceMock<MockNonlinearBeamformer>(geometry, 1u);
   std::unique_ptr<AudioProcessing> apm(
-      AudioProcessing::Create(config, nullptr, beamformer));
+      AudioProcessing::Create(config, nullptr, nullptr, beamformer));
   EXPECT_EQ(kNoErr, apm->gain_control()->Enable(true));
   ChannelBuffer<float> src_buf(kSamplesPerChannel, kNumInputChannels);
   ChannelBuffer<float> dest_buf(kSamplesPerChannel, kNumOutputChannels);
@@ -2391,18 +2404,17 @@ void UpdateBestSNR(const float* ref,
 // Due to the resampling distortion, we don't expect identical results, but
 // enforce SNR thresholds which vary depending on the format. 0 is a special
 // case SNR which corresponds to inf, or zero error.
-typedef std::tr1::tuple<int, int, int, int, double, double>
-    AudioProcessingTestData;
+typedef std::tuple<int, int, int, int, double, double> AudioProcessingTestData;
 class AudioProcessingTest
     : public testing::TestWithParam<AudioProcessingTestData> {
  public:
   AudioProcessingTest()
-      : input_rate_(std::tr1::get<0>(GetParam())),
-        output_rate_(std::tr1::get<1>(GetParam())),
-        reverse_input_rate_(std::tr1::get<2>(GetParam())),
-        reverse_output_rate_(std::tr1::get<3>(GetParam())),
-        expected_snr_(std::tr1::get<4>(GetParam())),
-        expected_reverse_snr_(std::tr1::get<5>(GetParam())) {}
+      : input_rate_(std::get<0>(GetParam())),
+        output_rate_(std::get<1>(GetParam())),
+        reverse_input_rate_(std::get<2>(GetParam())),
+        reverse_output_rate_(std::get<3>(GetParam())),
+        expected_snr_(std::get<4>(GetParam())),
+        expected_reverse_snr_(std::get<5>(GetParam())) {}
 
   virtual ~AudioProcessingTest() {}
 
@@ -2420,6 +2432,11 @@ class AudioProcessingTest
         }
       }
     }
+  }
+
+  void TearDown() {
+    // Remove "out" files after each test.
+    ClearTempOutFiles();
   }
 
   static void TearDownTestCase() {
@@ -2687,113 +2704,113 @@ TEST_P(AudioProcessingTest, Formats) {
 INSTANTIATE_TEST_CASE_P(
     CommonFormats,
     AudioProcessingTest,
-    testing::Values(std::tr1::make_tuple(48000, 48000, 48000, 48000, 0, 0),
-                    std::tr1::make_tuple(48000, 48000, 32000, 48000, 40, 30),
-                    std::tr1::make_tuple(48000, 48000, 16000, 48000, 40, 20),
-                    std::tr1::make_tuple(48000, 44100, 48000, 44100, 20, 20),
-                    std::tr1::make_tuple(48000, 44100, 32000, 44100, 20, 15),
-                    std::tr1::make_tuple(48000, 44100, 16000, 44100, 20, 15),
-                    std::tr1::make_tuple(48000, 32000, 48000, 32000, 30, 35),
-                    std::tr1::make_tuple(48000, 32000, 32000, 32000, 30, 0),
-                    std::tr1::make_tuple(48000, 32000, 16000, 32000, 30, 20),
-                    std::tr1::make_tuple(48000, 16000, 48000, 16000, 25, 20),
-                    std::tr1::make_tuple(48000, 16000, 32000, 16000, 25, 20),
-                    std::tr1::make_tuple(48000, 16000, 16000, 16000, 25, 0),
+    testing::Values(std::make_tuple(48000, 48000, 48000, 48000, 0, 0),
+                    std::make_tuple(48000, 48000, 32000, 48000, 40, 30),
+                    std::make_tuple(48000, 48000, 16000, 48000, 40, 20),
+                    std::make_tuple(48000, 44100, 48000, 44100, 20, 20),
+                    std::make_tuple(48000, 44100, 32000, 44100, 20, 15),
+                    std::make_tuple(48000, 44100, 16000, 44100, 20, 15),
+                    std::make_tuple(48000, 32000, 48000, 32000, 30, 35),
+                    std::make_tuple(48000, 32000, 32000, 32000, 30, 0),
+                    std::make_tuple(48000, 32000, 16000, 32000, 30, 20),
+                    std::make_tuple(48000, 16000, 48000, 16000, 25, 20),
+                    std::make_tuple(48000, 16000, 32000, 16000, 25, 20),
+                    std::make_tuple(48000, 16000, 16000, 16000, 25, 0),
 
-                    std::tr1::make_tuple(44100, 48000, 48000, 48000, 30, 0),
-                    std::tr1::make_tuple(44100, 48000, 32000, 48000, 30, 30),
-                    std::tr1::make_tuple(44100, 48000, 16000, 48000, 30, 20),
-                    std::tr1::make_tuple(44100, 44100, 48000, 44100, 20, 20),
-                    std::tr1::make_tuple(44100, 44100, 32000, 44100, 20, 15),
-                    std::tr1::make_tuple(44100, 44100, 16000, 44100, 20, 15),
-                    std::tr1::make_tuple(44100, 32000, 48000, 32000, 30, 35),
-                    std::tr1::make_tuple(44100, 32000, 32000, 32000, 30, 0),
-                    std::tr1::make_tuple(44100, 32000, 16000, 32000, 30, 20),
-                    std::tr1::make_tuple(44100, 16000, 48000, 16000, 25, 20),
-                    std::tr1::make_tuple(44100, 16000, 32000, 16000, 25, 20),
-                    std::tr1::make_tuple(44100, 16000, 16000, 16000, 25, 0),
+                    std::make_tuple(44100, 48000, 48000, 48000, 30, 0),
+                    std::make_tuple(44100, 48000, 32000, 48000, 30, 30),
+                    std::make_tuple(44100, 48000, 16000, 48000, 30, 20),
+                    std::make_tuple(44100, 44100, 48000, 44100, 20, 20),
+                    std::make_tuple(44100, 44100, 32000, 44100, 20, 15),
+                    std::make_tuple(44100, 44100, 16000, 44100, 20, 15),
+                    std::make_tuple(44100, 32000, 48000, 32000, 30, 35),
+                    std::make_tuple(44100, 32000, 32000, 32000, 30, 0),
+                    std::make_tuple(44100, 32000, 16000, 32000, 30, 20),
+                    std::make_tuple(44100, 16000, 48000, 16000, 25, 20),
+                    std::make_tuple(44100, 16000, 32000, 16000, 25, 20),
+                    std::make_tuple(44100, 16000, 16000, 16000, 25, 0),
 
-                    std::tr1::make_tuple(32000, 48000, 48000, 48000, 30, 0),
-                    std::tr1::make_tuple(32000, 48000, 32000, 48000, 35, 30),
-                    std::tr1::make_tuple(32000, 48000, 16000, 48000, 30, 20),
-                    std::tr1::make_tuple(32000, 44100, 48000, 44100, 20, 20),
-                    std::tr1::make_tuple(32000, 44100, 32000, 44100, 20, 15),
-                    std::tr1::make_tuple(32000, 44100, 16000, 44100, 20, 15),
-                    std::tr1::make_tuple(32000, 32000, 48000, 32000, 40, 35),
-                    std::tr1::make_tuple(32000, 32000, 32000, 32000, 0, 0),
-                    std::tr1::make_tuple(32000, 32000, 16000, 32000, 40, 20),
-                    std::tr1::make_tuple(32000, 16000, 48000, 16000, 25, 20),
-                    std::tr1::make_tuple(32000, 16000, 32000, 16000, 25, 20),
-                    std::tr1::make_tuple(32000, 16000, 16000, 16000, 25, 0),
+                    std::make_tuple(32000, 48000, 48000, 48000, 30, 0),
+                    std::make_tuple(32000, 48000, 32000, 48000, 35, 30),
+                    std::make_tuple(32000, 48000, 16000, 48000, 30, 20),
+                    std::make_tuple(32000, 44100, 48000, 44100, 20, 20),
+                    std::make_tuple(32000, 44100, 32000, 44100, 20, 15),
+                    std::make_tuple(32000, 44100, 16000, 44100, 20, 15),
+                    std::make_tuple(32000, 32000, 48000, 32000, 40, 35),
+                    std::make_tuple(32000, 32000, 32000, 32000, 0, 0),
+                    std::make_tuple(32000, 32000, 16000, 32000, 40, 20),
+                    std::make_tuple(32000, 16000, 48000, 16000, 25, 20),
+                    std::make_tuple(32000, 16000, 32000, 16000, 25, 20),
+                    std::make_tuple(32000, 16000, 16000, 16000, 25, 0),
 
-                    std::tr1::make_tuple(16000, 48000, 48000, 48000, 25, 0),
-                    std::tr1::make_tuple(16000, 48000, 32000, 48000, 25, 30),
-                    std::tr1::make_tuple(16000, 48000, 16000, 48000, 25, 20),
-                    std::tr1::make_tuple(16000, 44100, 48000, 44100, 15, 20),
-                    std::tr1::make_tuple(16000, 44100, 32000, 44100, 15, 15),
-                    std::tr1::make_tuple(16000, 44100, 16000, 44100, 15, 15),
-                    std::tr1::make_tuple(16000, 32000, 48000, 32000, 25, 35),
-                    std::tr1::make_tuple(16000, 32000, 32000, 32000, 25, 0),
-                    std::tr1::make_tuple(16000, 32000, 16000, 32000, 25, 20),
-                    std::tr1::make_tuple(16000, 16000, 48000, 16000, 40, 20),
-                    std::tr1::make_tuple(16000, 16000, 32000, 16000, 40, 20),
-                    std::tr1::make_tuple(16000, 16000, 16000, 16000, 0, 0)));
+                    std::make_tuple(16000, 48000, 48000, 48000, 25, 0),
+                    std::make_tuple(16000, 48000, 32000, 48000, 25, 30),
+                    std::make_tuple(16000, 48000, 16000, 48000, 25, 20),
+                    std::make_tuple(16000, 44100, 48000, 44100, 15, 20),
+                    std::make_tuple(16000, 44100, 32000, 44100, 15, 15),
+                    std::make_tuple(16000, 44100, 16000, 44100, 15, 15),
+                    std::make_tuple(16000, 32000, 48000, 32000, 25, 35),
+                    std::make_tuple(16000, 32000, 32000, 32000, 25, 0),
+                    std::make_tuple(16000, 32000, 16000, 32000, 25, 20),
+                    std::make_tuple(16000, 16000, 48000, 16000, 40, 20),
+                    std::make_tuple(16000, 16000, 32000, 16000, 40, 20),
+                    std::make_tuple(16000, 16000, 16000, 16000, 0, 0)));
 
 #elif defined(WEBRTC_AUDIOPROC_FIXED_PROFILE)
 INSTANTIATE_TEST_CASE_P(
     CommonFormats,
     AudioProcessingTest,
-    testing::Values(std::tr1::make_tuple(48000, 48000, 48000, 48000, 20, 0),
-                    std::tr1::make_tuple(48000, 48000, 32000, 48000, 20, 30),
-                    std::tr1::make_tuple(48000, 48000, 16000, 48000, 20, 20),
-                    std::tr1::make_tuple(48000, 44100, 48000, 44100, 15, 20),
-                    std::tr1::make_tuple(48000, 44100, 32000, 44100, 15, 15),
-                    std::tr1::make_tuple(48000, 44100, 16000, 44100, 15, 15),
-                    std::tr1::make_tuple(48000, 32000, 48000, 32000, 20, 35),
-                    std::tr1::make_tuple(48000, 32000, 32000, 32000, 20, 0),
-                    std::tr1::make_tuple(48000, 32000, 16000, 32000, 20, 20),
-                    std::tr1::make_tuple(48000, 16000, 48000, 16000, 20, 20),
-                    std::tr1::make_tuple(48000, 16000, 32000, 16000, 20, 20),
-                    std::tr1::make_tuple(48000, 16000, 16000, 16000, 20, 0),
+    testing::Values(std::make_tuple(48000, 48000, 48000, 48000, 20, 0),
+                    std::make_tuple(48000, 48000, 32000, 48000, 20, 30),
+                    std::make_tuple(48000, 48000, 16000, 48000, 20, 20),
+                    std::make_tuple(48000, 44100, 48000, 44100, 15, 20),
+                    std::make_tuple(48000, 44100, 32000, 44100, 15, 15),
+                    std::make_tuple(48000, 44100, 16000, 44100, 15, 15),
+                    std::make_tuple(48000, 32000, 48000, 32000, 20, 35),
+                    std::make_tuple(48000, 32000, 32000, 32000, 20, 0),
+                    std::make_tuple(48000, 32000, 16000, 32000, 20, 20),
+                    std::make_tuple(48000, 16000, 48000, 16000, 20, 20),
+                    std::make_tuple(48000, 16000, 32000, 16000, 20, 20),
+                    std::make_tuple(48000, 16000, 16000, 16000, 20, 0),
 
-                    std::tr1::make_tuple(44100, 48000, 48000, 48000, 15, 0),
-                    std::tr1::make_tuple(44100, 48000, 32000, 48000, 15, 30),
-                    std::tr1::make_tuple(44100, 48000, 16000, 48000, 15, 20),
-                    std::tr1::make_tuple(44100, 44100, 48000, 44100, 15, 20),
-                    std::tr1::make_tuple(44100, 44100, 32000, 44100, 15, 15),
-                    std::tr1::make_tuple(44100, 44100, 16000, 44100, 15, 15),
-                    std::tr1::make_tuple(44100, 32000, 48000, 32000, 20, 35),
-                    std::tr1::make_tuple(44100, 32000, 32000, 32000, 20, 0),
-                    std::tr1::make_tuple(44100, 32000, 16000, 32000, 20, 20),
-                    std::tr1::make_tuple(44100, 16000, 48000, 16000, 20, 20),
-                    std::tr1::make_tuple(44100, 16000, 32000, 16000, 20, 20),
-                    std::tr1::make_tuple(44100, 16000, 16000, 16000, 20, 0),
+                    std::make_tuple(44100, 48000, 48000, 48000, 15, 0),
+                    std::make_tuple(44100, 48000, 32000, 48000, 15, 30),
+                    std::make_tuple(44100, 48000, 16000, 48000, 15, 20),
+                    std::make_tuple(44100, 44100, 48000, 44100, 15, 20),
+                    std::make_tuple(44100, 44100, 32000, 44100, 15, 15),
+                    std::make_tuple(44100, 44100, 16000, 44100, 15, 15),
+                    std::make_tuple(44100, 32000, 48000, 32000, 20, 35),
+                    std::make_tuple(44100, 32000, 32000, 32000, 20, 0),
+                    std::make_tuple(44100, 32000, 16000, 32000, 20, 20),
+                    std::make_tuple(44100, 16000, 48000, 16000, 20, 20),
+                    std::make_tuple(44100, 16000, 32000, 16000, 20, 20),
+                    std::make_tuple(44100, 16000, 16000, 16000, 20, 0),
 
-                    std::tr1::make_tuple(32000, 48000, 48000, 48000, 35, 0),
-                    std::tr1::make_tuple(32000, 48000, 32000, 48000, 65, 30),
-                    std::tr1::make_tuple(32000, 48000, 16000, 48000, 40, 20),
-                    std::tr1::make_tuple(32000, 44100, 48000, 44100, 20, 20),
-                    std::tr1::make_tuple(32000, 44100, 32000, 44100, 20, 15),
-                    std::tr1::make_tuple(32000, 44100, 16000, 44100, 20, 15),
-                    std::tr1::make_tuple(32000, 32000, 48000, 32000, 35, 35),
-                    std::tr1::make_tuple(32000, 32000, 32000, 32000, 0, 0),
-                    std::tr1::make_tuple(32000, 32000, 16000, 32000, 40, 20),
-                    std::tr1::make_tuple(32000, 16000, 48000, 16000, 20, 20),
-                    std::tr1::make_tuple(32000, 16000, 32000, 16000, 20, 20),
-                    std::tr1::make_tuple(32000, 16000, 16000, 16000, 20, 0),
+                    std::make_tuple(32000, 48000, 48000, 48000, 35, 0),
+                    std::make_tuple(32000, 48000, 32000, 48000, 65, 30),
+                    std::make_tuple(32000, 48000, 16000, 48000, 40, 20),
+                    std::make_tuple(32000, 44100, 48000, 44100, 20, 20),
+                    std::make_tuple(32000, 44100, 32000, 44100, 20, 15),
+                    std::make_tuple(32000, 44100, 16000, 44100, 20, 15),
+                    std::make_tuple(32000, 32000, 48000, 32000, 35, 35),
+                    std::make_tuple(32000, 32000, 32000, 32000, 0, 0),
+                    std::make_tuple(32000, 32000, 16000, 32000, 40, 20),
+                    std::make_tuple(32000, 16000, 48000, 16000, 20, 20),
+                    std::make_tuple(32000, 16000, 32000, 16000, 20, 20),
+                    std::make_tuple(32000, 16000, 16000, 16000, 20, 0),
 
-                    std::tr1::make_tuple(16000, 48000, 48000, 48000, 25, 0),
-                    std::tr1::make_tuple(16000, 48000, 32000, 48000, 25, 30),
-                    std::tr1::make_tuple(16000, 48000, 16000, 48000, 25, 20),
-                    std::tr1::make_tuple(16000, 44100, 48000, 44100, 15, 20),
-                    std::tr1::make_tuple(16000, 44100, 32000, 44100, 15, 15),
-                    std::tr1::make_tuple(16000, 44100, 16000, 44100, 15, 15),
-                    std::tr1::make_tuple(16000, 32000, 48000, 32000, 25, 35),
-                    std::tr1::make_tuple(16000, 32000, 32000, 32000, 25, 0),
-                    std::tr1::make_tuple(16000, 32000, 16000, 32000, 25, 20),
-                    std::tr1::make_tuple(16000, 16000, 48000, 16000, 35, 20),
-                    std::tr1::make_tuple(16000, 16000, 32000, 16000, 35, 20),
-                    std::tr1::make_tuple(16000, 16000, 16000, 16000, 0, 0)));
+                    std::make_tuple(16000, 48000, 48000, 48000, 25, 0),
+                    std::make_tuple(16000, 48000, 32000, 48000, 25, 30),
+                    std::make_tuple(16000, 48000, 16000, 48000, 25, 20),
+                    std::make_tuple(16000, 44100, 48000, 44100, 15, 20),
+                    std::make_tuple(16000, 44100, 32000, 44100, 15, 15),
+                    std::make_tuple(16000, 44100, 16000, 44100, 15, 15),
+                    std::make_tuple(16000, 32000, 48000, 32000, 25, 35),
+                    std::make_tuple(16000, 32000, 32000, 32000, 25, 0),
+                    std::make_tuple(16000, 32000, 16000, 32000, 25, 20),
+                    std::make_tuple(16000, 16000, 48000, 16000, 35, 20),
+                    std::make_tuple(16000, 16000, 32000, 16000, 35, 20),
+                    std::make_tuple(16000, 16000, 16000, 16000, 0, 0)));
 #endif
 
 }  // namespace
@@ -2898,14 +2915,41 @@ TEST(ApmConfiguration, EnablePostProcessing) {
   auto mock_post_processor =
       std::unique_ptr<PostProcessing>(mock_post_processor_ptr);
   rtc::scoped_refptr<AudioProcessing> apm = AudioProcessing::Create(
-      webrtc_config, std::move(mock_post_processor), nullptr);
+      webrtc_config, std::move(mock_post_processor), nullptr, nullptr);
 
   AudioFrame audio;
   audio.num_channels_ = 1;
   SetFrameSampleRate(&audio, AudioProcessing::NativeRate::kSampleRate16kHz);
 
   EXPECT_CALL(*mock_post_processor_ptr, Process(testing::_)).Times(1);
-  std::cout << apm->ProcessStream(&audio) << std::endl;
+  apm->ProcessStream(&audio);
 }
 
+class MyEchoControlFactory : public EchoControlFactory {
+ public:
+  std::unique_ptr<EchoControl> Create(int sample_rate_hz) {
+    auto ec = new test::MockEchoControl();
+    EXPECT_CALL(*ec, AnalyzeRender(testing::_)).Times(1);
+    EXPECT_CALL(*ec, AnalyzeCapture(testing::_)).Times(2);
+    EXPECT_CALL(*ec, ProcessCapture(testing::_, testing::_)).Times(2);
+    return std::unique_ptr<EchoControl>(ec);
+  }
+};
+
+TEST(ApmConfiguration, EchoControlInjection) {
+  // Verify that apm uses an injected echo controller if one is provided.
+  webrtc::Config webrtc_config;
+  std::unique_ptr<EchoControlFactory> echo_control_factory(
+      new MyEchoControlFactory());
+
+  rtc::scoped_refptr<AudioProcessing> apm = AudioProcessing::Create(
+      webrtc_config, nullptr, std::move(echo_control_factory), nullptr);
+
+  AudioFrame audio;
+  audio.num_channels_ = 1;
+  SetFrameSampleRate(&audio, AudioProcessing::NativeRate::kSampleRate16kHz);
+  apm->ProcessStream(&audio);
+  apm->ProcessReverseStream(&audio);
+  apm->ProcessStream(&audio);
+}
 }  // namespace webrtc

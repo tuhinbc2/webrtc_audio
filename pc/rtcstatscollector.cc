@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -22,7 +23,6 @@
 #include "p2p/base/p2pconstants.h"
 #include "p2p/base/port.h"
 #include "pc/peerconnection.h"
-#include "pc/webrtcsession.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/stringutils.h"
 #include "rtc_base/timeutils.h"
@@ -77,7 +77,7 @@ std::string RTCTransportStatsIDFromTransportChannel(
 }
 
 std::string RTCTransportStatsIDFromBaseChannel(
-    const ProxyTransportMap& proxy_to_transport,
+    const std::map<std::string, std::string>& proxy_to_transport,
     const cricket::BaseChannel& base_channel) {
   auto proxy_it = proxy_to_transport.find(base_channel.content_name());
   if (proxy_it == proxy_to_transport.cend())

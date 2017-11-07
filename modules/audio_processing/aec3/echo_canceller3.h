@@ -63,7 +63,7 @@ class Aec3RenderQueueItemVerifier {
 class EchoCanceller3 : public EchoControl {
  public:
   // Normal c-tor to use.
-  EchoCanceller3(const AudioProcessing::Config::EchoCanceller3& config,
+  EchoCanceller3(const EchoCanceller3Config& config,
                  int sample_rate_hz,
                  bool use_highpass_filter);
   // Testing c-tor that is used only for testing purposes.
@@ -90,10 +90,7 @@ class EchoCanceller3 : public EchoControl {
   }
 
   // Validates a config.
-  static bool Validate(const AudioProcessing::Config::EchoCanceller3& config);
-  // Dumps a config to a string.
-  static std::string ToString(
-      const AudioProcessing::Config::EchoCanceller3& config);
+  static bool Validate(const EchoCanceller3Config& config);
 
  private:
   class RenderWriter;

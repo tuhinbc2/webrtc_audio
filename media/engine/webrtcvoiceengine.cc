@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "api/call/audio_sink.h"
@@ -77,7 +78,9 @@ const int kMaxPayloadType = 127;
 
 class ProxySink : public webrtc::AudioSinkInterface {
  public:
-  ProxySink(AudioSinkInterface* sink) : sink_(sink) { RTC_DCHECK(sink); }
+  explicit ProxySink(AudioSinkInterface* sink) : sink_(sink) {
+    RTC_DCHECK(sink);
+  }
 
   void OnData(const Data& audio) override { sink_->OnData(audio); }
 
@@ -367,7 +370,7 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
   options.echo_cancellation = rtc::Optional<bool>(false);
   options.extended_filter_aec = rtc::Optional<bool>(false);
   LOG(LS_INFO) << "Always disable AEC on iOS. Use built-in instead.";
-#elif defined(ANDROID)
+#elif defined(WEBRTC_ANDROID)
   ec_mode = webrtc::kEcAecm;
   options.extended_filter_aec = rtc::Optional<bool>(false);
 #endif
@@ -393,7 +396,7 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
   options.typing_detection = rtc::Optional<bool>(false);
   options.experimental_ns = rtc::Optional<bool>(false);
   LOG(LS_INFO) << "Always disable NS on iOS. Use built-in instead.";
-#elif defined(ANDROID)
+#elif defined(WEBRTC_ANDROID)
   options.typing_detection = rtc::Optional<bool>(false);
   options.experimental_ns = rtc::Optional<bool>(false);
 #endif
@@ -404,17 +407,21 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
   options.auto_gain_control = rtc::Optional<bool>(false);
   options.experimental_agc = rtc::Optional<bool>(false);
   LOG(LS_INFO) << "Always disable AGC on iOS. Use built-in instead.";
-#elif defined(ANDROID)
+#elif defined(WEBRTC_ANDROID)
   options.experimental_agc = rtc::Optional<bool>(false);
 #endif
 
 #if defined(WEBRTC_IOS) || defined(WEBRTC_ANDROID)
-  // Turn off the gain control if specified by the field trial. The purpose of the field trial is to reduce the amount of resampling performed inside the audio processing module on mobile platforms by whenever possible turning off the fixed AGC mode and the high-pass filter. (https://bugs.chromium.org/p/webrtc/issues/detail?id=6181).
+  // Turn off the gain control if specified by the field trial.
+  // The purpose of the field trial is to reduce the amount of resampling
+  // performed inside the audio processing module on mobile platforms by
+  // whenever possible turning off the fixed AGC mode and the high-pass filter.
+  // (https://bugs.chromium.org/p/webrtc/issues/detail?id=6181).
   if (webrtc::field_trial::IsEnabled(
           "WebRTC-Audio-MinimizeResamplingOnMobile")) {
     options.auto_gain_control = rtc::Optional<bool>(false);
     LOG(LS_INFO) << "Disable AGC according to field trial.";
-    if (!(options.noise_suppression.value_or(false) or
+    if (!(options.noise_suppression.value_or(false) ||
           options.echo_cancellation.value_or(false))) {
       // If possible, turn off the high-pass filter.
       LOG(LS_INFO) << "Disable high-pass filter in response to field trial.";
@@ -450,7 +457,7 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
     }
     webrtc::apm_helpers::SetEcStatus(
         apm(), *options.echo_cancellation, ec_mode);
-#if !defined(ANDROID)
+#if !defined(WEBRTC_ANDROID)
     webrtc::apm_helpers::SetEcMetricsStatus(apm(), *options.echo_cancellation);
 #endif
     if (ec_mode == webrtc::kEcAecm) {
@@ -616,8 +623,7 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
                  << *options.recording_sample_rate;
     if (adm()->SetRecordingSampleRate(*options.recording_sample_rate)) {
       LOG(LS_WARNING) << "SetRecordingSampleRate("
-                      << *options.recording_sample_rate << ") failed, err="
-                      << adm()->LastError();
+                      << *options.recording_sample_rate << ") failed.";
     }
   }
 
@@ -625,8 +631,7 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
     LOG(LS_INFO) << "Playout sample rate is " << *options.playout_sample_rate;
     if (adm()->SetPlayoutSampleRate(*options.playout_sample_rate)) {
       LOG(LS_WARNING) << "SetPlayoutSampleRate("
-                      << *options.playout_sample_rate << ") failed, err="
-                      << adm()->LastError();
+                      << *options.playout_sample_rate << ") failed.";
     }
   }
   return true;
@@ -809,6 +814,7 @@ class WebRtcVoiceMediaChannel::WebRtcAudioSendStream
       webrtc::AudioTransport* voe_audio_transport,
       uint32_t ssrc,
       const std::string& c_name,
+      const std::string track_id,
       const rtc::Optional<webrtc::AudioSendStream::Config::SendCodecSpec>&
           send_codec_spec,
       const std::vector<webrtc::RtpExtension>& extensions,
@@ -835,6 +841,7 @@ class WebRtcVoiceMediaChannel::WebRtcAudioSendStream
     config_.rtp.extensions = extensions;
     config_.audio_network_adaptor_config = audio_network_adaptor_config;
     config_.encoder_factory = encoder_factory;
+    config_.track_id = track_id;
     rtp_parameters_.encodings[0].ssrc = rtc::Optional<uint32_t>(ssrc);
 
     if (send_codec_spec) {
@@ -1836,7 +1843,7 @@ bool WebRtcVoiceMediaChannel::AddSendStream(const StreamParams& sp) {
   rtc::Optional<std::string> audio_network_adaptor_config =
       GetAudioNetworkAdaptorConfig(options_);
   WebRtcAudioSendStream* stream = new WebRtcAudioSendStream(
-      channel, audio_transport, ssrc, sp.cname, send_codec_spec_,
+      channel, audio_transport, ssrc, sp.cname, sp.id, send_codec_spec_,
       send_rtp_extensions_, max_send_bitrate_bps_, audio_network_adaptor_config,
       call_, this, engine()->encoder_factory_);
   send_streams_.insert(std::make_pair(ssrc, stream));

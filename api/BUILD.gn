@@ -36,6 +36,7 @@ rtc_source_set("call_api") {
 rtc_static_library("libjingle_peerconnection_api") {
   cflags = []
   sources = [
+    "candidate.cc",
     "candidate.h",
     "datachannelinterface.h",
     "dtmfsenderinterface.h",
@@ -52,6 +53,7 @@ rtc_static_library("libjingle_peerconnection_api") {
     "notifier.h",
     "peerconnectionfactoryproxy.h",
     "peerconnectionproxy.h",
+    "proxy.cc",
     "proxy.h",
     "rtcerror.cc",
     "rtcerror.h",
@@ -62,6 +64,7 @@ rtc_static_library("libjingle_peerconnection_api") {
     "statstypes.cc",
     "statstypes.h",
     "turncustomizer.h",
+    "umametrics.cc",
     "umametrics.h",
     "videosourceproxy.h",
   ]
@@ -262,6 +265,15 @@ rtc_source_set("optional") {
   ]
 }
 
+rtc_source_set("refcountedbase") {
+  sources = [
+    "refcountedbase.h",
+  ]
+  deps = [
+    "../rtc_base:rtc_base_approved",
+  ]
+}
+
 rtc_source_set("libjingle_peerconnection_test_api") {
   testonly = true
   sources = [
@@ -286,6 +298,23 @@ if (rtc_include_tests) {
 
     public_deps = [
       ":audio_mixer_api",
+    ]
+
+    deps = [
+      "../test:test_support",
+      "//testing/gmock",
+    ]
+  }
+
+  rtc_source_set("mock_video_codec_factory") {
+    testonly = true
+    sources = [
+      "test/mock_video_decoder_factory.h",
+      "test/mock_video_encoder_factory.h",
+    ]
+
+    public_deps = [
+      "../api/video_codecs:video_codecs_api",
     ]
 
     deps = [

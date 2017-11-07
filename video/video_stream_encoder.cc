@@ -137,18 +137,20 @@ class VideoStreamEncoder::EncodeTask : public rtc::QueuedTask {
  private:
   bool Run() override {
     RTC_DCHECK_RUN_ON(&video_stream_encoder_->encoder_queue_);
-    RTC_DCHECK_GT(
-        video_stream_encoder_->posted_frames_waiting_for_encode_.Value(), 0);
     video_stream_encoder_->stats_proxy_->OnIncomingFrame(frame_.width(),
                                                          frame_.height());
     ++video_stream_encoder_->captured_frame_count_;
-    if (--video_stream_encoder_->posted_frames_waiting_for_encode_ == 0) {
+    const int posted_frames_waiting_for_encode =
+        video_stream_encoder_->posted_frames_waiting_for_encode_.fetch_sub(1);
+    RTC_DCHECK_GT(posted_frames_waiting_for_encode, 0);
+    if (posted_frames_waiting_for_encode == 1) {
       video_stream_encoder_->EncodeVideoFrame(frame_, time_when_posted_us_);
     } else {
       // There is a newer frame in flight. Do not encode this frame.
       LOG(LS_VERBOSE)
           << "Incoming frame dropped due to that the encoder is blocked.";
       ++video_stream_encoder_->dropped_frame_count_;
+      video_stream_encoder_->stats_proxy_->OnFrameDroppedInEncoderQueue();
     }
     if (log_stats_) {
       LOG(LS_INFO) << "Number of frames: captured "
@@ -389,7 +391,7 @@ VideoStreamEncoder::VideoStreamEncoder(
       sink_(nullptr),
       settings_(settings),
       codec_type_(PayloadStringToCodecType(settings.payload_name)),
-      video_sender_(Clock::GetRealTimeClock(), this, nullptr),
+      video_sender_(Clock::GetRealTimeClock(), this),
       overuse_detector_(
           overuse_detector.get()
               ? overuse_detector.release()
@@ -400,7 +402,6 @@ VideoStreamEncoder::VideoStreamEncoder(
                     stats_proxy)),
       stats_proxy_(stats_proxy),
       pre_encode_callback_(pre_encode_callback),
-      module_process_thread_(nullptr),
       max_framerate_(-1),
       pending_encoder_reconfiguration_(false),
       encoder_start_bitrate_bps_(0),
@@ -411,6 +412,7 @@ VideoStreamEncoder::VideoStreamEncoder(
       clock_(Clock::GetRealTimeClock()),
       degradation_preference_(
           VideoSendStream::DegradationPreference::kDegradationDisabled),
+      posted_frames_waiting_for_encode_(0),
       last_captured_timestamp_(0),
       delta_ntp_internal_ms_(clock_->CurrentNtpInMilliseconds() -
                              clock_->TimeInMilliseconds()),
@@ -463,20 +465,6 @@ void VideoStreamEncoder::Stop() {
   });
 
   shutdown_event_.Wait(rtc::Event::kForever);
-}
-
-void VideoStreamEncoder::RegisterProcessThread(
-    ProcessThread* module_process_thread) {
-  RTC_DCHECK_RUN_ON(&thread_checker_);
-  RTC_DCHECK(!module_process_thread_);
-  module_process_thread_ = module_process_thread;
-  module_process_thread_->RegisterModule(&video_sender_, RTC_FROM_HERE);
-  module_process_thread_checker_.DetachFromThread();
-}
-
-void VideoStreamEncoder::DeRegisterProcessThread() {
-  RTC_DCHECK_RUN_ON(&thread_checker_);
-  module_process_thread_->DeRegisterModule(&video_sender_);
 }
 
 void VideoStreamEncoder::SetBitrateObserver(
@@ -723,6 +711,10 @@ void VideoStreamEncoder::OnFrame(const VideoFrame& video_frame) {
       incoming_frame, this, rtc::TimeMicros(), log_stats)));
 }
 
+void VideoStreamEncoder::OnDiscardedFrame() {
+  stats_proxy_->OnFrameDroppedBySource();
+}
+
 bool VideoStreamEncoder::EncoderPaused() const {
   RTC_DCHECK_RUN_ON(&encoder_queue_);
   // Pause video if paused by caller or as long as the network is down or the
@@ -861,12 +853,20 @@ EncodedImageCallback::Result VideoStreamEncoder::OnEncodedImage(
   return result;
 }
 
-void VideoStreamEncoder::OnDroppedFrame() {
-  encoder_queue_.PostTask([this] {
-    RTC_DCHECK_RUN_ON(&encoder_queue_);
-    if (quality_scaler_)
-      quality_scaler_->ReportDroppedFrame();
-  });
+void VideoStreamEncoder::OnDroppedFrame(DropReason reason) {
+  switch (reason) {
+    case DropReason::kDroppedByMediaOptimizations:
+      stats_proxy_->OnFrameDroppedByMediaOptimizations();
+      encoder_queue_.PostTask([this] {
+        RTC_DCHECK_RUN_ON(&encoder_queue_);
+        if (quality_scaler_)
+          quality_scaler_->ReportDroppedFrame();
+      });
+      break;
+    case DropReason::kDroppedByEncoder:
+      stats_proxy_->OnFrameDroppedByEncoder();
+      break;
+  }
 }
 
 void VideoStreamEncoder::OnReceivedIntraFrameRequest(size_t stream_index) {

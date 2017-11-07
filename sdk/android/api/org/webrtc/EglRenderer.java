@@ -33,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 public class EglRenderer implements VideoRenderer.Callbacks, VideoSink {
   private static final String TAG = "EglRenderer";
   private static final long LOG_INTERVAL_SEC = 4;
-  private static final int MAX_SURFACE_CLEAR_COUNT = 3;
 
   public interface FrameListener { void onFrame(Bitmap frame); }
 
@@ -55,11 +54,15 @@ public class EglRenderer implements VideoRenderer.Callbacks, VideoSink {
   private class EglSurfaceCreation implements Runnable {
     private Object surface;
 
+    // TODO(bugs.webrtc.org/8491): Remove NoSynchronizedMethodCheck suppression.
+    @SuppressWarnings("NoSynchronizedMethodCheck")
     public synchronized void setSurface(Object surface) {
       this.surface = surface;
     }
 
     @Override
+    // TODO(bugs.webrtc.org/8491): Remove NoSynchronizedMethodCheck suppression.
+    @SuppressWarnings("NoSynchronizedMethodCheck")
     public synchronized void run() {
       if (surface != null && eglBase != null && !eglBase.hasSurface()) {
         if (surface instanceof Surface) {
@@ -76,7 +79,7 @@ public class EglRenderer implements VideoRenderer.Callbacks, VideoSink {
     }
   }
 
-  private final String name;
+  protected final String name;
 
   // |renderThreadHandler| is a handler for communicating with |renderThread|, and is synchronized
   // on |handlerLock|.
