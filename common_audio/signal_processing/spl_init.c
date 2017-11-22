@@ -101,6 +101,7 @@ static void once(void (*func)(void)) {
 }
 
 #elif defined(_WIN32)
+#define NOMINMAX
 #include <windows.h>
 
 static void once(void (*func)(void)) {

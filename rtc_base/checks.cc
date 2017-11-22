@@ -27,6 +27,7 @@
 #endif
 
 #if defined(WEBRTC_WIN)
+#define NOMINMAX
 #include <windows.h>
 #endif
 

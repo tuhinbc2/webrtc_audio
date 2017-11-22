@@ -12,6 +12,8 @@
  * The core AEC algorithm, which is presented with time-aligned signals.
  */
 
+#define NOMINMAX
+
 #include "modules/audio_processing/aec/aec_core.h"
 
 #include <algorithm>
@@ -260,8 +262,7 @@ void DivergentFilterFraction::AddObservation(const PowerLevel& nearlevel,
   // does not diverge. Here we allow some margin (0.01 * near end level) and
   // numerical error (1.0). We count divergence only when the AEC output
   // signal is active.
-  if (output_signal_active &&
-      level_increase > std::max(0.01 * near_level, 1.0))
+  if (output_signal_active && level_increase > (std::max(0.01 * near_level, 1.0)))
     occurrence_++;
   ++count_;
   if (count_ == kDivergentFilterFractionAggregationWindowSize) {

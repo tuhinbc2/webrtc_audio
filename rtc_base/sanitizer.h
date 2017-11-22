@@ -47,7 +47,7 @@
 // Ask ASan to mark the memory range [ptr, ptr + element_size * num_elements)
 // as being unaddressable, so that reads and writes are not allowed. ASan may
 // narrow the range to the nearest alignment boundaries.
-static inline void rtc_AsanPoison(const volatile void* ptr,
+static __inline void rtc_AsanPoison(const volatile void* ptr,
                                   size_t element_size,
                                   size_t num_elements) {
 #if RTC_HAS_ASAN
@@ -58,7 +58,7 @@ static inline void rtc_AsanPoison(const volatile void* ptr,
 // Ask ASan to mark the memory range [ptr, ptr + element_size * num_elements)
 // as being addressable, so that reads and writes are allowed. ASan may widen
 // the range to the nearest alignment boundaries.
-static inline void rtc_AsanUnpoison(const volatile void* ptr,
+static __inline void rtc_AsanUnpoison(const volatile void* ptr,
                                     size_t element_size,
                                     size_t num_elements) {
 #if RTC_HAS_ASAN
@@ -68,7 +68,7 @@ static inline void rtc_AsanUnpoison(const volatile void* ptr,
 
 // Ask MSan to mark the memory range [ptr, ptr + element_size * num_elements)
 // as being uninitialized.
-static inline void rtc_MsanMarkUninitialized(const volatile void* ptr,
+static __inline void rtc_MsanMarkUninitialized(const volatile void* ptr,
                                              size_t element_size,
                                              size_t num_elements) {
 #if RTC_HAS_MSAN
@@ -79,7 +79,7 @@ static inline void rtc_MsanMarkUninitialized(const volatile void* ptr,
 // Force an MSan check (if any bits in the memory range [ptr, ptr +
 // element_size * num_elements) are uninitialized the call will crash with an
 // MSan report).
-static inline void rtc_MsanCheckInitialized(const volatile void* ptr,
+static __inline void rtc_MsanCheckInitialized(const volatile void* ptr,
                                             size_t element_size,
                                             size_t num_elements) {
 #if RTC_HAS_MSAN

@@ -7,6 +7,8 @@
 // be found in the AUTHORS file in the root of the source tree.
 //
 
+#define NOMINMAX
+
 #include "system_wrappers/include/metrics_default.h"
 
 #include <algorithm>
