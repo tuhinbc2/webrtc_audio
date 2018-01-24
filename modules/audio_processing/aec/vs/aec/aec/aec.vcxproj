@@ -108,6 +108,7 @@
     <ClCompile Include="..\..\..\aec_core_sse2.cc" />
     <ClCompile Include="..\..\..\aec_resampler.cc" />
     <ClCompile Include="..\..\..\echo_cancellation.cc" />
+    <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\aec_core.h" />
