@@ -1,0 +1,120 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{ABD7BF1A-9EE8-4AC3-A8D1-C1D0E4A109E2}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>aec</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)\..\..\..\..\..\..\;$(ProjectDir)\..\..\..\</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)\..\..\..\..\..\..\;$(ProjectDir)\..\..\..\</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MinSpace</Optimization>
+      <PreprocessorDefinitions>WIN32;WEBRTC_APM_DEBUG_DUMP=0;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions);WEBRTC_WIN</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>Full</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;WEBRTC_APM_DEBUG_DUMP=0;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions);WEBRTC_WIN</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <AdditionalOptions>/std:c++latest %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\..\..\common_audio\ring_buffer.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\auto_correlation.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\cross_correlation.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\downsample_fast.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\min_max_operations.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\randomization_functions.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\spl_init.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\spl_inl.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\signal_processing\vector_scaling_operations.c" />
+    <ClCompile Include="..\..\..\..\..\..\common_audio\sparse_fir_filter.cc" />
+    <ClCompile Include="..\..\..\..\..\..\rtc_base\checks.cc" />
+    <ClCompile Include="..\..\..\..\..\..\rtc_base\criticalsection.cc" />
+    <ClCompile Include="..\..\..\..\..\..\system_wrappers\source\cpu_features.cc" />
+    <ClCompile Include="..\..\..\..\..\..\system_wrappers\source\metrics_default.cc" />
+    <ClCompile Include="..\..\..\..\logging\apm_data_dumper.cc" />
+    <ClCompile Include="..\..\..\..\three_band_filter_bank.cc" />
+    <ClCompile Include="..\..\..\..\utility\block_mean_calculator.cc" />
+    <ClCompile Include="..\..\..\..\utility\delay_estimator.cc" />
+    <ClCompile Include="..\..\..\..\utility\delay_estimator_wrapper.cc" />
+    <ClCompile Include="..\..\..\..\utility\ooura_fft.cc" />
+    <ClCompile Include="..\..\..\..\utility\ooura_fft_sse2.cc" />
+    <ClCompile Include="..\..\..\aec_core.cc" />
+    <ClCompile Include="..\..\..\aec_core_sse2.cc" />
+    <ClCompile Include="..\..\..\aec_resampler.cc" />
+    <ClCompile Include="..\..\..\echo_cancellation.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\aec_core.h" />
+    <ClInclude Include="..\..\..\aec_resampler.h" />
+    <ClInclude Include="..\..\..\echo_cancellation.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
